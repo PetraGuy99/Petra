@@ -5,6 +5,8 @@ setwd('C:/dev/code/Petra')
 
 library(leaflet)
 
+library(dplyr)
+
 #Nick Hoare - Inoculated treatment
 
 
@@ -18,5 +20,5 @@ leaflet() %>%
   addPolygons(
     lng = c(-2.3202680, -2.321158, -2.321158, -2.319996, -2.3202680),
     lat = c(51.0936780, 51.09239, 51.093854, 51.094244,51.0936780 ),
-    color = "blue"
+    color = "blue" 
   )

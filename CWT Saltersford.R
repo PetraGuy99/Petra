@@ -46,6 +46,8 @@ data = data.frame(
                      times = c(length(controli), length(controlf),
                                length(pelleti), length(pelletf))))
 )
+
+ 
 summary_stat = data %>%
   group_by(group) %>%
   summarize(
