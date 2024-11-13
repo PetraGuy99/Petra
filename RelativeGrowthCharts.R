@@ -244,7 +244,7 @@ data <- df
 library(stringr)
 
 # Create a grouped horizontal bar chart
-ggplot(data, aes(x = Site, y = Growth, fill = Treatment)) +
+relgrowth = ggplot(data, aes(x = Site, y = Growth, fill = Treatment)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.5) +
   scale_fill_manual(values = c("Control" = "orange", "Rhizopellet" = 'darkgreen', "Fertiliser" = 'grey')) +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 20))+
@@ -254,3 +254,4 @@ ggplot(data, aes(x = Site, y = Growth, fill = Treatment)) +
        x = "Site", y = "Relative Growth %") +
   theme(legend.position = "top")
 
+ggsave("../../results/relgrowth.png", plot = relgrowth, width = 6, height = 4, dpi = 300,bg = 'white')

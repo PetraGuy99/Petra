@@ -4,7 +4,7 @@ setwd('C:/dev/code')
 library(dplyr)
 library(ggplot2)
 
-Dundreggan = read.csv('../data/Dundreggan.csv', colClasses =c(
+Dundreggan = read.csv('../../data/Dundreggan.csv', colClasses =c(
   'integer',
   'integer',
   'character',

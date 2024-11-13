@@ -1,11 +1,11 @@
-setwd('C:/dev/code')
+setwd('C:/dev/code/Petra')
 
 
 library(dplyr)
 library(ggplot2)
 
 
-CWT_Salt = read.csv('../data/CWT_Salt.csv', colClasses =c(
+CWT_Salt = read.csv('../../data/CWT_Salt.csv', colClasses =c(
   'integer',
   'integer',
   'integer',
@@ -17,13 +17,18 @@ CWT_Salt = read.csv('../data/CWT_Salt.csv', colClasses =c(
   'integer'
 ))
 
-#there are different numbers of treatment and control across the 2 years, by separating the groups
-#we can do a delta h for the trees which match up
-#note that some trees in 2023 do not match to those in 2024 - e.g. tree 67 might have been measured
-#in 2023 but not 2024, so need to merge on tree_id contained in both df
-#prob not worth matching trees here
+#tree numbers did not match in 2023/2024 data sets, so only plt mean height possible for 
+#first two data points
+# 100 trees of each species retagged autumn 2024 - and thereafter change in tree ht
+#is possible.
+
 
 ################################################################################
+
+#this to get change in PLOT MEAN HtS for first two data points when no tree numbers
+
+treespp = 'B_pendula'
+
 
 getheights = function(t, yr, treat){
   data = CWT_Salt%>% filter(treatment == treat)%>%
@@ -34,12 +39,12 @@ getheights = function(t, yr, treat){
 }
 
 #get control initial heights - input required tree, 'Q_robur' or 'B_pendula'
-controli = getheights('B_pendula',2023,0)
-controlf = getheights('B_pendula',2024, 0)
+controli = getheights(treespp,2023,0)
+controlf = getheights(treespp,2024, 0)
 
 #get treatment average plot heights
-pelleti = getheights('B_pendula',2023,1)
-pelletf = getheights('B_pendula',2024,1)
+pelleti = getheights(treespp,2023,1)
+pelletf = getheights(treespp,2024,1)
 
 data = data.frame(
   value = c(controli, controlf, pelleti, pelletf),
@@ -47,20 +52,24 @@ data = data.frame(
                      times = c(length(controli), length(controlf),
                                length(pelleti), length(pelletf))))
 )
-summary_stat = data %>%
+summary_stat = data %>%   #work out the mean and se of the means
   group_by(group) %>%
   summarize(
     mean = mean(value),
     se = sd(value)/sqrt(n())
   )
 
-getrelchange = function(initial,final){ # data is the summary stat for the values
+#the average plot change
+getrelchange = function(initial,final){ # calculate the mean change in ht
   change = ((mean(final)-mean(initial))/mean(initial))*100
   return(change)
 }
 
 control.relchange = getrelchange(controli, controlf)
 treat.change = getrelchange(pelleti, pelletf)
+
+
+#this to plot the error bars
 
 summary_stat$se2 = (summary_stat$se)^2
 
@@ -76,22 +85,87 @@ term3 = summary_stat[4,4]/summary_stat[4,2]
 
 pelletchange.se = unlist(term1*sqrt(term2+term3))
 
+#new df of means and errors
 data = data.frame(
   group = c('control','pellet'),
   value = c(control.relchange, treat.change),
   se = c(controlchange.se, pelletchange.se )
+  
+  
 )
 
-ggplot(data, aes(x = group, y = value, fill = group))+
-  geom_point(stat = 'identity', colour = 'black', position = position_dodge(0.9), show.legend = F)+
+ggplot(data, aes(x = group, y = value)) +
+  geom_point(aes(fill = group), size = 5, shape = 21, colour = 'black', 
+             position = position_dodge(0.9), show.legend = FALSE) +
   geom_errorbar(aes(ymin = value-se, ymax = value+se), width = 0.2, position = position_dodge((0.9)))+
-  labs(title = 'Relative difference in plot mean heights between 2023 and 2024',
-       subtitle = 'Betula pendula', #input tree here for graph
-       x = 'treatment',
-       y =  'relative change in height')+
-  theme(text=element_text(size = 20))
+  scale_fill_manual(values = c("orange", "green")) +  # Set specific fill colors for points
+  scale_color_manual(values = c("orange", "green")) + # Apply color to ensure consistency
+  labs(
+    title = 'Differences in plot mean height for treatment and control 2023 - 2024',
+    subtitle = treespp,
+    x = 'Treatment',
+    y = 'Mean Height'
+  ) +
+  theme_minimal() +
+  theme(text = element_text(size = 15))
 
 
+#############################################################################
+#### now add in the third data point and plot a time series
+#note that this is bit wrong because third mean is random resample of 100 trees
+#first two points sampled more trees
+
+#read the new 2024 data
+SALT_end2024 = read.csv('../../data/Saltersford_tagging_2024_2.csv')
+
+treespp = 'Quercus_robur'
+
+
+qr_control_ht = SALT_end2024%>% filter(Treatment == 'control')%>% filter(Tree_Species == treespp) %>%
+  select(Height_cm)
+
+qr_treat_ht = SALT_end2024%>% filter(Treatment == 'treatment')%>% filter(Tree_Species == treespp) %>%
+  select(Height_cm)
+
+qr_control_meanht = mean(qr_control_ht$Height_cm)
+qr_treat_meanht = mean(qr_treat_ht$Height_cm)
+
+treespp = 'Betula_pendula'
+
+bp_control_ht = SALT_end2024%>% filter(Treatment == 'control')%>% filter(Tree_Species == treespp) %>%
+  select(Height_cm)
+bp_treat_ht  = SALT_end2024%>% filter(Treatment == 'treatment')%>% filter(Tree_Species == treespp) %>%
+  select(Height_cm)
+
+bp_control_meanht = mean(bp_control_ht$Height_cm)
+bp_treat_mean_ht = mean(bp_treat_ht$Height_cm)
+
+
+#create df for the 3 points in the time series
+
+salt = data.frame(
+  tree = c(rep('Betula_pendula'),3, rep('Quercus_robur'), 3),
+  time = c('0','1','2','0','1','2'),
+  treatment = c(rep('control',3), rep('treatment',3)),
+  deltah = c()
+
+
+
+
+
+
+
+#get control initial heights - input required tree, 'Q_robur' or 'B_pendula'
+controli = getheights(treespp,0)
+controlf = getheights(treespp,2024, 0)
+
+#get treatment average plot heights
+pelleti = getheights(treespp,2023,1)
+pelletf = getheights(treespp,2024,1)
+
+#get the averages for 2023, 2024 beginning and 2024 end.
+
+qr_pellet_control = 
 
 
 
@@ -152,10 +226,6 @@ ggplot(data, aes(x = group, y = value, fill = group)) +
 #look for difference in mean ht between treatment and control - in 2024
 #omit 2023 because things only just planted
 
-treespp = 'Q_robur'
-treespp = 'B_pendula'
-
-getmeanh(treespp)
 
 getmeanh = function(treespp){
 tree_control = CWT_Salt %>% filter(tree == treespp & treatment == 0 & year == 2024)
@@ -179,17 +249,28 @@ summary_stat = data %>%
     se = sd(value)/sqrt(n())
   )
 
-ggplot(summary_stat, aes(x = group, y = mean, fill = group))+
-  geom_point(stat = 'identity', colour = 'black', position = position_dodge(0.9), show.legend = F)+
-  geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = 0.2, position = position_dodge((0.9)))+
-  labs(title = 'Differences in mean height for treatment and control 2024',
-       subtitle = treespp,
-       x = 'treatment',
-       y =  'mean height')+
-  theme(text=element_text(size = 20))
+ggplot(summary_stat, aes(x = group, y = mean)) +
+  geom_point(aes(fill = group), size = 5, shape = 21, colour = 'black', 
+             position = position_dodge(0.9), show.legend = FALSE) +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), 
+                width = 0.2, colour = 'black', position = position_dodge(0.9)) +
+  scale_fill_manual(values = c("orange", "green")) +  # Set specific fill colors for points
+  scale_color_manual(values = c("orange", "green")) + # Apply color to ensure consistency
+  labs(
+    title = 'plot mean height for treatment and control 2024',
+    subtitle = treespp,
+    x = 'Treatment',
+    y = 'Mean Height'
+  ) +
+  theme_minimal() +
+  theme(text = element_text(size = 15))
 }
 
 
+treespp = 'Q_robur'
+treespp = 'B_pendula'
+
+getmeanh(treespp)
 #########################################
 
 #survival or mortality rate

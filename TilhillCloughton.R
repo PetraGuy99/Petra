@@ -5,7 +5,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 
-Cloughton= read.csv('../data/Cloughton.csv', colClasses =c(
+Cloughton= read.csv('../../data/Cloughton.csv', colClasses =c(
   'integer',
   'integer',
   'integer',
