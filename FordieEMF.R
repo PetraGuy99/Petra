@@ -2,8 +2,9 @@ setwd('C:/dev/code/Petra')
 library(tidyr)
 library(dplyr)
 library(purrr)
+library(writexl)
 
-# Load the species and functional traits data
+install# Load the species and functional traits data
 species <- read.csv('../../data/Fordie_eDNA_Data_species.csv')
 functionaltraits <- read.csv('../../data/FunctionalTraits.csv')
 
@@ -66,3 +67,6 @@ process_row <- function(row) {
 # Apply the processing function across all rows in the presence-absence dataframe
 result_list <- pres_abs.workingfungi %>%
   pmap(~ process_row(data.frame(...)))
+
+
+write_xlsx(result_list, path = '../../results/Fordiespecies.xlsx')
