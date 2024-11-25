@@ -4,37 +4,47 @@ library(dplyr)
 library(purrr)
 library(writexl)
 # Load the species and functional traits data
-species <- read.csv('../../data/Fordie_eDNA_Data_species.csv')
+species <- read.csv('../../data/Coite_spp.csv')
 functionaltraits <- read.csv('../../data/FunctionalTraits.csv')
 
 # Clean the species data: remove rows with empty species or certain values and rename 'genus' to 'GENUS'
+#this removes all rows where OTU is at genus level or above
 species_df_specieslevel <- species %>%
-  filter(species != "" & species != "sp" & species != "unclassified" & !is.na(species)) %>%
-  rename(GENUS = genus)
+  filter(species != "" & species != "sp" & species != "unclassified" & !is.na(species)) 
 
 # Merge species data with functional traits, keeping all species from species_df_specieslevel
-Fordie.functionaltraits <- species_df_specieslevel %>%
+Coite.functionaltraits <- species_df_specieslevel %>%
   left_join(functionaltraits, by = 'GENUS') %>%
   select(GENUS, species, primary_lifestyle)
 
 # Load proportions data and convert to presence-absence
-proportions <- read.csv('../../data/Fordie_proportions.csv')
+proportions <- read.csv('../../data/Coilte_proportions.csv')
 pres_abs <- proportions %>%
   mutate(across(-X, ~ ifelse(. != 0, 1, 0))) %>%
   rename(location = X)
 
-# Clean column names by removing 's__' prefix and update column headers
+# Clean column names by removing 's__', 'o_' and 'g_ prefix and update column headers
 colnames(pres_abs)[-1] <- sub("^s__", "", colnames(pres_abs)[-1])
+colnames(pres_abs)[-1] <- sub("^g__", "", colnames(pres_abs)[-1])
+colnames(pres_abs)[-1] <- sub("^o__", "", colnames(pres_abs)[-1])
+colnames(pres_abs)[-1] <- sub("^f__", "", colnames(pres_abs)[-1])
+colnames(pres_abs)[-1] <- sub("^k__", "", colnames(pres_abs)[-1])
+colnames(pres_abs)[-1] <- sub("^p__", "", colnames(pres_abs)[-1])
+colnames(pres_abs)[-1] <- sub("^c__", "", colnames(pres_abs)[-1])
 colnames(pres_abs)[1] <- 'sample_name'
 
 # Prepare the working fungi species list (genus_species)
-working_fungi <- paste(Fordie.functionaltraits$GENUS, Fordie.functionaltraits$species, sep = '_')
+#this is all the fungi that occur in the Coilte data
+working_fungi <- paste(Coite.functionaltraits$GENUS, Coite.functionaltraits$species, sep = '_')
+
+#delete this
 
 # Rename specific columns in presence-absence data to match the required format
 pres_abs <- pres_abs %>%
   rename(
     'Ilyonectria_mors-panacis' = 'Ilyonectria_mors.panacis',
-    'Nadsonia_starkeyi-henricii' = 'Nadsonia_starkeyi.henricii'
+    'Nadsonia_starkeyi-henricii' = 'Nadsonia_starkeyi.henricii',
+    'Spirosphaera_carici-graminis'= 'Spirosphaera_carici.graminis'
   )
 
 # Create working fungi presence-absence data frame
