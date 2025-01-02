@@ -5,7 +5,7 @@ library(dplyr)
 library(ggplot2)
 
 
-CWT_Salt = read.csv('../../data/CWT_Salt.csv', colClasses =c(
+CWT_Salt = read.csv('../../data/CWT_Salt_ht.csv', colClasses =c(
   'integer',
   'integer',
   'integer',

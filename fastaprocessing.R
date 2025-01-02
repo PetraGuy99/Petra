@@ -44,7 +44,7 @@ library(seqinr)
 
 
 # Function to split FASTA file into smaller files
-split_fasta <- function(input_file, output_prefix, max_otus = 5) {
+split_fasta <- function(input_file, output_prefix, max_otus = 1000) {
   # Read the input FASTA file
   seqs <- read.fasta(input_file)
   
@@ -67,7 +67,6 @@ split_fasta <- function(input_file, output_prefix, max_otus = 5) {
 }
 
 
-split_fasta("../../results/fordie_modified.fasta", "../../results/split_fasta", 5)
+split_fasta("../../results/fordie_modified.fasta", "../../results/split_fasta", 1000)
 
-#make small test fasta
-split_fasta('../../resultssplit_fasta_1','../../results/smal_test_fast')
+
