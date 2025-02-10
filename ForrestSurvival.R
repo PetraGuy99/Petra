@@ -18,11 +18,21 @@ forrest = read_excel('../../data/Forrest_WorkingSheet.xlsx', sheet = 'survival')
      width = 0.75                            # Slightly narrower bars
    ) +
    scale_fill_manual(
-     values = c("control" = "orange", "pellet,area1" = "darkgreen", "pellet,area2" = "darkgreen")  # Custom colors
+     values = c("control" = "orange", "pellet,area1" = "darkgreen", "pellet,area2" = "palegreen")  # Custom colors
    ) +
    labs(title = "Normalised survival, height and rcd for Pinus sylvestris, Forrest Estate ",
         x = "",
-        y = "Normalised value") +
+        y = "") +
+   theme(
+     axis.text.x = element_text(size =16),
+     axis.text.y = element_text(size = 16),
+     axis.title.x = element_text(size = 16, face = "bold"),  
+     axis.title.y = element_text(size = 16, face = "bold"),
+     panel.background = element_rect(fill = "white", color = "white"),  # Remove gray background
+     plot.background = element_rect(fill = "white", color = "white"),  # Remove plot background
+     panel.grid.major = element_blank(),  # Optionally remove grid lines
+     panel.grid.minor = element_blank() 
+   )
    theme_minimal()
  
    

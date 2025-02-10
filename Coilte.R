@@ -17,7 +17,7 @@ Coilte= read.csv('../data/Coilte.csv', colClasses =c(
 ))
 
 #several tree spp here
-# trees do correspl=ond so do the delta h type plots#################
+# trees do correspond so do the delta h type plots#################
 #trees = Salix_spp, Q_spp, Alnus_spp, C_avellana, P_sylvestris, B_pendula
 
 t = 'Q_spp'

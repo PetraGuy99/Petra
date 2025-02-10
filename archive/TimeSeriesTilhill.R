@@ -43,6 +43,9 @@ ggplot(data, aes(x = factor(time), y = height, fill = treatment)) +
     axis.title.y = element_text(size = 16) ,
     axis.title.x = element_text(size = 16) # Adjust x-axis labels
   )
+
+
+
 ##check distribution of height
 hist(data$height) #right skew
 hist(log(data$height)) # looks more Normal
