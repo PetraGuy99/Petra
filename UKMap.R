@@ -14,16 +14,20 @@ if (st_crs(uk_shapefile) != 4326) {
   uk_shapefile <- st_transform(uk_shapefile, crs = 4326)
 }
 
+# Normalize dot sizes for better visualization
+max_size <- 10  # Adjust as needed
+min_size <- 3   # Adjust as needed
+locations$scaled_size <- scales::rescale(locations$Tree.Numbers, to = c(min_size, max_size))
 # Create the map using leaflet
 leaflet() %>%
   addPolygons(data = uk_shapefile, 
               color = "black", 
               weight = 2, 
-              fillColor = "green",  # Set fill color to green
-              fillOpacity = 0.5)%>%
+              fillColor = "palegreen",  
+              fillOpacity = 0.5) %>%
   addCircleMarkers(data = locations, 
-                   lng = ~lon, lat = ~lat, 
-                   radius = 3, color = "red", 
-                   fill = TRUE, fillColor = "red", fillOpacity = 0.8)%>%
-  setView(lng = -3.1883, lat = 55.3781, zoom = 6) # Center on the UK
-
+                   lng = ~Longitude, lat = ~Latitude, 
+                   radius = ~scaled_size,  # Scale marker size
+                   color = "red", 
+                   fill = TRUE, fillColor = "red", fillOpacity = 0.8) %>%
+  setView(lng = -3.1883, lat = 55.3781, zoom = 6)  # Center on the UK
