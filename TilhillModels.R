@@ -31,6 +31,10 @@ data = read_excel('../../data/TilhillWorkingCopy.xlsx', sheet = 'GEEdata')
 #delete NA rows
 data = data %>% drop_na(height)
 
+#check what this would look like if we removed the 'rogue' tree of 153cm in ht from control plot
+
+data <- data[data$height != 153, ] # remember to reinstate this - this is just a check
+
 #look at quick summary
 mean_heights <- data %>%
   group_by(time, treatment,tree) %>%
@@ -38,7 +42,7 @@ mean_heights <- data %>%
 
 print(mean_heights)
 
-#boxplots of all the poonts
+#boxplots of all the points
 ggplot(data, aes(x = factor(time), y = height, fill = treatment)) +
   geom_boxplot() +
   labs(title = "Tilhill, height measurements across three time points",
@@ -157,7 +161,8 @@ ggplot(data, aes(x = time, y = height, color = treatment)) +
 
 ###############################################################################
 
-#GEE
+#GEE #no point to this, get same values - note that its a faff to get the data into
+#the correct shape - so if its changed, this wont work
 
 #create a 0,1 column for the treatment and put on order of 0,1
 data$binary = ifelse(data$treatment == 'Control',0,1)
@@ -176,6 +181,7 @@ summary(gee_model) # not working 28/1/2025 - NaNs imply matrix singular, but not
 ###################################################################################
 
 #mixed effects - even though shouldnt really do it with only 2 random effects
+#sp skip this
 
 mixed_model_exp = mixed_model <- lmer(log(height) ~ time * treatment +(1 | plot), data = data) 
 summary(mixed_model_exp)
@@ -269,12 +275,12 @@ g3 = ggplot(month17, aes(x = height, fill = treatment)) +
     panel.border = element_rect(color = "black", fill = NA)  # Add border if needed
   )
 
-#run g3 with legend to extarct the legend as a grob , then turn it off, and plot the legend grob
+#run g3 with legend to extract the legend as a grob , then turn it off, and plot the legend grob
 #in grid.arrange
-#legend = ggplotGrob(g3)$grobs[[which(sapply(ggplotGrob(g3)$grobs, function(x) x$name) == "guide-box")]]
+legend = ggplotGrob(g3)$grobs[[which(sapply(ggplotGrob(g3)$grobs, function(x) x$name) == "guide-box")]]
 
 #plot the hisotgrams for the other time points
-#library(gridExtra)
+library(gridExtra)
 grid.arrange(g1,g2,g3,legend, ncol = 1)
 
 
@@ -519,7 +525,20 @@ ggplot(group_means_adj, aes(x = time, y = Mean_Height_Adjusted, color = treatmen
     axis.title.y = element_text(size = 14)
   )
 
+#in black and white for a publication
 
-
+ggplot(group_means_adj, aes(x = time, y = Mean_Height_Adjusted, color = treatment, shape = treatment)) +
+  geom_point(size = 4) +  # Plot points
+  geom_line(size = 1) +   # Connect the points with a line
+  scale_color_manual(values = c("Control" = "black", "Pellet" = "black")) + # Custom colors for treatments
+  scale_shape_manual(values = c("Control" = 17, "Pellet" = 15)) + # Triangle for Control, Square for Pellet
+  labs(title = "Adjusted Mean Heights", x = "Time (months)", y = "Adjusted Mean Height (cm)") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14)
+  )
 
 

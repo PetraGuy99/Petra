@@ -738,6 +738,31 @@ ggplot(group_means_adj, aes(x = time, y = Mean_Height_Adjusted, color = treatmen
   )
 
 
+#redoing in black and white for a publication
 
-
+ggplot(group_means_adj, aes(x = time, y = Mean_Height_Adjusted, color = treatment, shape = treatment)) +
+  geom_point(size = 4) +  # Plot points
+  geom_line(size = 1) +   # Connect the points with a line
+  scale_color_manual(values = c(
+    "Control" = "black",
+    "Fertiliser" = "black",
+    "Pellet" = "black"
+  )) +
+  scale_shape_manual(values = c(
+    "Control" = 17,      # triangle
+    "Fertiliser" = 16,   # circle
+    "Pellet" = 15        # square
+  )) +
+  labs(
+    title = "Adjusted Mean Heights",
+    x = "Time (months)",
+    y = "Adjusted Mean Height (cm)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14)
+  )
 

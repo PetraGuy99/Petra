@@ -6,10 +6,6 @@ library(writexl)
 library(readxl)
 library(xlsx)
 
-reads = read.csv('../../data/GradientTest.csv')
-
-setwd('C:/dev/code/Petra')
-#a
 install.packages("BiocManager")
 
 # Install Biostrings package from Bioconductor
@@ -22,9 +18,6 @@ library(Biostrings)
 seqs = read.csv('../../data/sequences.csv', header = F)
 
 
-#construct OTU label
-otu_lables = paste('OTU', 1:length(fasta_sequences), sep = '_')
-
 #make sequences df
 sequences_df <- data.frame(
   ID = seqs$V1,
@@ -34,9 +27,7 @@ sequences_df <- data.frame(
 dna_sequences <- DNAStringSet(sequences_df$Sequence)
 names(dna_sequences) <- sequences_df$ID 
 
-#save as csv and as modified fasta - i.e. just OTU and sequence
-write.csv(sequences_df, '../../data/MBI_sequences.csv')
-
+#create a fasta file for this data
 writeXStringSet(dna_sequences, "../../results/MBI_modified.fasta")
 
 ###############################################################
@@ -68,6 +59,14 @@ split_fasta <- function(input_file, output_prefix, max_otus = 1000) {
 }
 
 
-split_fasta("../../results/fordie_modified.fasta", "../../results/split_fasta", 1000)
+split_fasta("../../results/mbi_modified.fasta", "../../results/split_fasta", 1000)
 
+###############################################################################
 
+##look at the reads - just for the 12 locations that are in the gradient
+
+reads = read.csv('../../data/GradientTest_reads.csv', header = T)
+
+#remove the OTUs where all the entries are zero for this samples
+reads_no_zero <- reads[, c(1:3, which(colSums(reads[, -c(1:3), drop = FALSE]) != 0) + 3)]
+                         
