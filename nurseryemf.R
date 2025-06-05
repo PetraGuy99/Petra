@@ -1,4 +1,6 @@
 #looking at nursery species
+# this is the FR data - so DO NOT USE this data - it will eventually be published
+#just FYI at the moment (10/4/2025)
 setwd('C:/dev/code/Petra')
 library(readxl)
 library(dplyr)
