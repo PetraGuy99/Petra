@@ -713,7 +713,7 @@ data.control = data %>% filter(Site == 'Site_3')
 data_site1 = rbind.data.frame(data.1,data.control)
 data_site2 = rbind.data.frame(data.2, data.control)
 
-group_means <- data_site2 %>%
+group_means <- data_site1 %>%
   group_by(treatment, time, Site) %>%
   summarize(Mean_Height = mean(height, na.rm = TRUE), .groups = "drop") 
 
@@ -728,13 +728,13 @@ ggplot(group_means_adj, aes(x = time, y = Mean_Height_Adjusted, color = treatmen
   geom_point(size = 4) +  # Plot points
   geom_line(size = 1) +   # Connect the points with a line
   scale_color_manual(values = c("Control" = "orange", "Fertiliser" = 'blue', "Pellet" = "darkgreen")) + # Custom colors for treatments
-  labs(title = "Adjusted Mean Heights", x = "Time(months)", y = "Adjusted Mean Height(cm)") +
+  labs(title = '', x = "Time(months)", y = "Adjusted Mean Height(cm)") +
   theme_minimal() +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 14),
-    axis.title.y = element_text(size = 14)
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 18),
+    axis.text.y = element_text(size = 18),
+    axis.title.x = element_text(size = 18),
+    axis.title.y = element_text(size = 18)
   )
 
 

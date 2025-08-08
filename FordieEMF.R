@@ -305,7 +305,7 @@ no_singletons.B <- cbind(reads_filtered.2[, 1, drop = FALSE],
 
 #FIRST STEP IS TO MUNGE THE BLAST DATA INTO A NICE CSV
  
-#read in first blast shhet
+#read in first blast sheet
 blast = read_excel('../../data/blast.xlsx', sheet = 'blast5', col_names = F)
 
 #1. remove rows starting 'Length','Score','Identities','Strand','Sbjct','Query:'  

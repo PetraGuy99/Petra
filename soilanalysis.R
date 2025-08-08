@@ -325,7 +325,7 @@ ggplot() +
 
 df.customer = soildata %>% filter(`SiteCode` == 'AB')
 
-df.customer_long <- df.customer[, 4:15] %>% 
+df.customer_long <- df.customer[, 4:14] %>% 
   pivot_longer(cols = everything(), 
                names_to = "Category", 
                values_to = "Value")
@@ -356,8 +356,8 @@ PineC = df.customer %>% filter(Sample %in% c('AB5','AB9','AB10'))
 library(purrr)
 library(flextable)
 #put the differebt species df in here
-Control = SitkaC
-Treatment =SitkaT
+Control = PineC
+Treatment = PineT
 soil_properties <- names(Treatment)[4:14]
 
 # Perform t-tests for each soil property
@@ -455,7 +455,7 @@ Cont = df.customer %>% filter(Sample %in% c('AC4','AC5','AC6'))
 
 library(purrr)
 library(flextable)
-#put the differebt species df in here
+#put the different species df in here
 Control = Cont
 Treatment =Treat
 soil_properties <- names(Treatment)[4:14]
@@ -532,13 +532,13 @@ t_test_results %>%
   set_caption("T-Test Results for control and treatment soils") %>%
   theme_vanilla()%>% autofit()
 
-###### Knoydart
+###### Forrest - forgot this one?
 
 #single plot chart ### if you want ...for a customer...but normalised doesnt help
 #here because no point comparing ActiveC to pH on the same chart 
 #need multiple single box plots for each soil property
 
-df.customer = soildata %>% filter(`SiteCode` == 'AE')
+df.customer = soildata %>% filter(`SiteCode` == 'AB')
 
 df.customer_long <- df.customer[, 4:14] %>% 
   pivot_longer(cols = everything(), 
@@ -553,8 +553,8 @@ ggplot(df.customer_long, aes(x = "", y = Value)) +
   labs(x = NULL, y = "Value", title = "Soil Property Distributions") +
   theme_bw()
 
-Treat = df.customer %>% filter(Sample %in% c('AE4','AE5','AE6'))
-Cont = df.customer %>% filter(Sample %in% c('AE1','AE2','AE3'))
+Treat = df.customer %>% filter(Sample %in% c('AB4','AB5','AB6'))
+Cont = df.customer %>% filter(Sample %in% c('AB1','AB2','AB3'))
 
 
 
