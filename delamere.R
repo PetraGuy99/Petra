@@ -17,7 +17,10 @@ allreads = read_xlsx('../../data/DelamereData.xlsx', sheet = 'SppSite')
 #cols D0A:F3C, and delete col 99, the taxon detail column.
 reads = allreads[,-c(40:75,135)] # just the Delamere pilot study data
 
+#remove rows where all entried are zero - i.e. those species were in the transect samples
+#shouldnt make any difference to SAC ect because 1's and 0s counted - but just in case
 
+reads <- reads[rowSums(reads[ , -1]) != 0, ]
 ################################################################################
 #create a rarefied data frame - in case we want to do any diversity analysis!
 #vegan assumes rows are samples and cols are species - site/species, need to transpose the data
@@ -51,6 +54,19 @@ rarefied_df <- as.data.frame(rarefied_back)
 # Add species column as first column
 rarefied_df <- tibble::rownames_to_column(rarefied_df, var = "Species")
 
+rarefied_no_zero <- rarefied_df[rowSums(rarefied_df[ , -1]) != 0, ] # now 675
+
+#check lost species#############################################################
+species_before <- colnames(reads_t)[colSums(reads_t) > 0]
+
+# Species present after rarefaction
+species_after <- colnames(rarefied)[colSums(rarefied) > 0]
+
+# Species lost = present before but absent after
+species_lost <- setdiff(species_before, species_after)
+
+species_lost
+
 ###############################################################################
 #merge with fungal traits
 traits = read.csv('../../data/FunctionalTraits.csv')
@@ -59,7 +75,7 @@ traits = read.csv('../../data/FunctionalTraits.csv')
 traits$primary_lifestyle[traits$primary_lifestyle == ""] <- NA
 
  #split the taxonomy column so can merge by genus
-rare.split <- rarefied_df %>%
+rare.split <- rarefied_no_zero %>%
    separate(Species, into = c("GENUS", "Species"), sep = "_")
 
 fungi.merged = merge(rare.split, traits, by = 'GENUS', all.x = TRUE)
@@ -108,12 +124,12 @@ checkingdf = write.csv(checking_df,'../../data/checking.csv')
 
 #to remove the >genus level matches, take the rows from checking_df 
 #where Species column is sp, this has genus level AND above genus level
-above_genus = checking_df %>% filter(Species == 'sp') #179
+above_genus = checking_df %>% filter(Species == 'sp') #97...discard
 
 #remove rows from fungi.merged where GENUS&species match above_genus
 #this is all fungi with a sp name AND a guild
 spp_level_guild = fungi.merged %>%
-  filter(Species != "sp", !is.na(primary_lifestyle)) #855
+  filter(Species != "sp", !is.na(primary_lifestyle)) #435
 
 #this is all fungi with a sp name and no guild
 species_level_noguild = fungi.merged %>%
@@ -124,24 +140,30 @@ species_level_noguild = fungi.merged %>%
 #other wise the genus column is not a genus name - its above, hence no match
 #the are fungi at genus level with a guild
 genus_level_guild = fungi.merged %>%
-  filter(Species== "sp", !is.na(primary_lifestyle)) #284
+  filter(Species== "sp", !is.na(primary_lifestyle)) #138
 
 #this is BOTH the above genus level fungi AND any that might have been at genus
 #level - but the genus was not recognized by Functional Traits
 genus_level_noguild = fungi.merged %>%
-  filter(Species== "sp", is.na(primary_lifestyle)) #179 
+  filter(Species== "sp", is.na(primary_lifestyle)) #97
 
 #make df of genus_level_guild + spp_level_guild + species_level_noguild
-allfungi = rbind.data.frame(spp_level_guild, species_level_noguild, genus_level_guild)
+allfungi = rbind.data.frame(spp_level_guild, species_level_noguild, genus_level_guild) #578
 
 #tidy this up by removing all the weird cols from Functional Traits merge
 allfungi = allfungi[,-c(100:105,107:122,123)]
 #This is now the working df - the only items missing will be any at genus level,
 #with sp for speices, but no guild match. They can only be found by inspection -
 #there were 2
+#this is not presence absence - it has read values
 
+allfungi_pa <- allfungi
+allfungi_pa[, -c(1:2, 100:124)] <- 
+  lapply(allfungi_pa[, -c(1:2, 100:124)], function(x) ifelse(x > 0, 1, 0))
 #################################################################################
-
+#__
+#cab use all fungi abundnace here because counting rows
+#__
 
 library(stringr)
 
@@ -166,7 +188,12 @@ ggplot(lifestyle_counts, aes(x = reorder(lifestyle, -n), y = n)) +
        x = "Primary Lifestyle",
        y = "Number of Species") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # bigger x-axis text
+    axis.text.y = element_text(size = 14),                        # bigger y-axis text
+    axis.title.x = element_text(size = 16),                       # bigger x-axis title
+    axis.title.y = element_text(size = 16)                        # bigger y-axis title
+  )
 ###############################################################################
 
 ###############################################################################
@@ -208,12 +235,33 @@ ggplot(sac_df, aes(x = Samples, y = Richness, color = Group, fill = Group)) +
   labs(
     x = "Number of Samples",
     y = "Cumulative Species Richness",
-    title = "Species-Area Curve for Different Sample Sets"
+    title = "Species-Area Curve, Three Different Sample Sets"
   ) +
   theme_minimal() +
   theme(
-    legend.title = element_blank(),
-    plot.title = element_text(face = "bold")
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+    axis.text.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    legend.position = "none"   
+  )
+
+#just do the A samples for Fordie report
+ggplot(df1, aes(x = Samples, y = Richness, color = Group, fill = Group)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Richness - SD, ymax = Richness + SD), alpha = 0.2, colour = NA) +
+  labs(
+    x = "Number of Samples",
+    y = "Cumulative Species Richness",
+    title = ""
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+    axis.text.y = element_text(size = 16),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    legend.position = "none"   
   )
 
 ################################################################################
@@ -270,6 +318,25 @@ ggplot(df_all, aes(x = Sites, y = Richness, color = Group, fill = Group)) +
     legend.title = element_blank(),
     plot.title = element_text(face = "bold")
   )
+###
+#WHAT ABOUT JUST SAPROS?###################################################
+
+
+sapro <- allfungi_pa %>% filter(lifestyle == 'saprotroph')
+
+sapro_samples <- sapro[, c(3:5, 39:99)]
+sapro_pa_t <- t(sapro_samples)
+
+# Run species accumulation
+sapro_accum <- specaccum(sapro_pa_t, method = "random")
+
+plot(sapro_accum,
+     ci.type = "poly",
+     col = "blue", lwd = 2,
+     ci.lty = 0, ci.col = "lightblue",
+     xlab = "Number of samples",
+     ylab = "Cumulative species richness",
+     main = "Species Accumulation Curve (Saprotrophs)")
 
 #######################################################################
 
@@ -381,6 +448,12 @@ ggplot(sac_df_combined, aes(x = Samples, y = Richness, color = Group, fill = Gro
     legend.title = element_blank(),
     plot.title = element_text(face = "bold")
   ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # bigger x-axis text
+    axis.text.y = element_text(size = 14),                        # bigger y-axis text
+    axis.title.x = element_text(size = 16),                       # bigger x-axis title
+    axis.title.y = element_text(size = 16)                        # bigger y-axis title
+  )+
   scale_x_continuous(breaks = scales::pretty_breaks(n = max(sac_df_combined$Samples)))
 
 #----------------------------
@@ -420,6 +493,30 @@ venn_grobs <- lapply(names(venn_lists), function(g) {
     main = paste("Species Overlap: Pooled vs Singles,", g)
   )
   grobTree(venn)  # <— wrap in grobTree to make it compatible
+})
+
+# Plot them in a grid
+grid.newpage()
+grid.arrange(grobs = venn_grobs, ncol = 3)
+
+
+#redo without the lables because messy for Fordie report
+
+venn_grobs <- lapply(names(venn_lists), function(g) {
+  venn <- venn.diagram(
+    x = venn_lists[[g]],
+    filename = NULL,
+    fill = c("skyblue", "lightgreen"),
+    alpha = 0.5,
+    cex = 3,
+    cat.cex = 1.5,
+    cat.pos = 0,
+    cat.dist = 0.05,
+    category.names = c("", ""),      # <-- remove labels here
+    main = paste(g),
+    main.cex = 3
+  )
+  grobTree(venn)  # wrap in grobTree to make it compatible
 })
 
 # Plot them in a grid
@@ -476,6 +573,22 @@ ggplot(df, aes(x = group, y = richness)) +
        x = "Group",
        y = "Species Richness")
 
+
+# is a box plot sensible when some of the samples sizes are 3 samples?
+
+ggplot(df, aes(x = group, y = richness)) +
+  geom_bar(stat = "summary", fun = "mean", fill = "lightblue", color = "black") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) +
+  theme_minimal() +
+  labs(title = "Species Richness by Group",
+       x = "Group",
+       y = "Mean Species Richness ± SE")+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # bigger x-axis text
+    axis.text.y = element_text(size = 14),                        # bigger y-axis text
+    axis.title.x = element_text(size = 16),                       # bigger x-axis title
+    axis.title.y = element_text(size = 16)                        # bigger y-axis title
+  )
 ################################################################################
 
 allfungi_pa <- allfungi
@@ -527,96 +640,738 @@ ggplot(richness_df, aes(x = reorder(Sample, -Richness), y = Richness)) +
 #Is it better to take three separate samples, or do three extracts from the same sample
 #What is richness of three Extracts compared to three separate, and how does community overlap
 
-#for a12, collect a12 and the reps
-a12 = cbind.data.frame(allfungi$A12, allfungi$A121, allfungi$A122)
-a12[a12>0] = 1
-
-#ust plot as points rather than SAC, coz only 3 items
-species_a12 <- which(a12$A12 == 1)
-
-# Species in a122 not in a12
-species_a121_new <- which(a12$A121 == 1 & a12$A12== 0)
-
-# Species in a123 not in a12 or a122
-species_a123_new <- which(a12$A122 == 1 & a12$A12 == 0 & a12$A121 == 0)
-
-count1 <- length(species_a12)
-count2 <- count1 + length(species_a121_new)
-count3 <- count2 + length(species_a123_new)
-
-repeats = c(count1,count2,count3)
-
 #compare this to taking three separate samples
 #look at different combinations of A samples in the area of A12
 #A12+A3+A4
 #A12+A13+A20
 #A12+A21+A5
 
-three.1 = cbind.data.frame(allfungi$A12,allfungi$A3,allfungi$A4)
-three.2 = cbind.data.frame(allfungi$A12,allfungi$A13,allfungi$A20)
-three.3 = cbind.data.frame(allfungi$A12,allfungi$A21,allfungi$A5)
+#compare that to A12,A121, A122
 
-three.1[three.1 > 0] = 1
-three.2[three.2 > 0] = 1
-three.3[three.3 > 0] = 1
+get_species_repeats <- function(df, col1, col2, col3) {
+  # Convert column names to symbols if given as strings
+  col1 <- rlang::ensym(col1)
+  col2 <- rlang::ensym(col2)
+  col3 <- rlang::ensym(col3)
+  
+  # Extract and binarise presence-absence data
+  data <- cbind.data.frame(
+    col1 = as.integer(df[[as.character(col1)]] > 0),
+    col2 = as.integer(df[[as.character(col2)]] > 0),
+    col3 = as.integer(df[[as.character(col3)]] > 0)
+  )
+  
+  # Identify unique species at each step
+  species_1 <- which(data$col1 == 1)
+  species_2_new <- which(data$col2 == 1 & data$col1 == 0)
+  species_3_new <- which(data$col3 == 1 & data$col1 == 0 & data$col2 == 0)
+  
+  # Cumulative counts
+  count1 <- length(species_1)
+  count2 <- count1 + length(species_2_new)
+  count3 <- count2 + length(species_3_new)
+  
+  # Return vector
+  df_out <- c(count1, count2, count3)
+  return(df_out)
+}
 
-species_three.1 <- which(three.1[,1] == 1)
-three.1_new <- which(three.1[,2] == 0 & three.1[,1] == 1)
-three.1_newagain = which(three.1[,1] == 0 & three.1[,2] == 0 & three.1[,3] == 1)
+repeatsA12 = get_species_repeats(allfungi, A12, A121, A122)
+singlesA12.test1 = get_species_repeats(allfungi,A12, A13, A20)
+singlesA12.test2 = get_species_repeats(allfungi,A12, A21, A5)
+singlesA12.test3 = get_species_repeats(allfungi,A12, A3, A4)
 
-count1 <- length(species_three.1)
-count2 <- count1 + length(three.1_new)
-count3 <- count2 + length(three.1_newagain)
+#now repeat this for A34 and A60
+#A34,A341,A342
+#A34,A35,A26
+#A34,A33,A25
+#A34,A42,A43
 
-#add these to the plot_df
-singles.1 = c(count1,count2,count3)
-##########################################
-#create the #SAC for the next set of 3 singles, A12,13,20
-species_three.2 <- which(three.2[,1] == 1)
-three.2_new <- which(three.2[,2] == 0 & three.2[,1] == 1)
-three.2_newagain = which(three.2[,1] == 0 & three.2[,2] == 0 & three.2[,3] == 1)
+repeatsA34 = get_species_repeats(allfungi, A34, A341, A342)
+singlesA34.test1 = get_species_repeats(allfungi,A34, A35, A26)
+singlesA34.test2 = get_species_repeats(allfungi,A34, A33, A25)
+singlesA34.test3 = get_species_repeats(allfungi,A34, A42, A43)
 
-count1 <- length(species_three.2)
-count2 <- count1 + length(three.2_new)
-count3 <- count2 + length(three.2_newagain)
+#A60,A601,A602
+#A60,A61,A52
+#A60,A59,A51
+#A60,A53,A52
 
-#add these to the plot_df
-singles.2 = c(count1,count2,count3)
+repeatsA60 = get_species_repeats(allfungi, A60, A601, A602)
+singlesA60.test1 = get_species_repeats(allfungi,A60, A61, A52)
+singlesA60.test2 = get_species_repeats(allfungi,A60, A59, A51)
+singlesA60.test3 = get_species_repeats(allfungi,A60, A53, A52)
 
-########################################
+#make df
+repeats_df = cbind.data.frame(repeatsA12,singlesA12.test1,singlesA12.test2,singlesA12.test3,
+                              repeatsA34,singlesA34.test1, singlesA34.test2, singlesA34.test3,
+                              repeatsA60, singlesA60.test1, singlesA60.test2,singlesA60.test3 )
+colnames(repeats_df) = c('A12reps','A12a','A12b','A12c',
+                         'A34reps','A34a','A34b','A34c',
+                         'A60reps','A60a','A60b','A60c')
+repeats_df$sample = c(1,2,3)
 
-#create the #SAC for the next set of 3 singles, A12,21,5
-species_three.3 <- which(three.3[,1] == 1)
-three.3_new <- which(three.3[,2] == 0 & three.3[,1] == 1)
-three.3_newagain = which(three.3[,1] == 0 & three.3[,2] == 0 & three.3[,3] == 1)
+special_lines <- c("A12reps", "A34reps", "A60reps")
 
-count1 <- length(species_three.3)
-count2 <- count1 + length(three.3_new)
-count3 <- count2 + length(three.3_newagain)
+df_long <- repeats_df %>%
+  pivot_longer(
+    cols = -sample,
+    names_to = "Variable",
+    values_to = "Value"
+  ) %>%
+  mutate(
+    ColIndex = as.numeric(factor(Variable, levels = unique(Variable))),
+    ChartID = ((ColIndex - 1) %/% 4) + 1,
+    LineType = ifelse(Variable %in% special_lines, "dashed", "solid")
+  )
 
-#add these to the plot_df
-singles.3 = c(count1,count2,count3)
+ggplot(df_long, aes(x = sample, y = Value, colour = Variable, group = Variable, linetype = LineType)) +
+  geom_line(linewidth = 1) +
+  facet_wrap(~ ChartID, scales = "free_y") +
+  scale_linetype_identity() +
+  scale_x_continuous(breaks = scales::pretty_breaks(), labels = as.integer) +
+  labs(x = "Number of samples", y = "Cumulative alpha diversity",
+       title = "Three examples of taking three separate samples, or 2 additional soil aliquots") +
+  theme_minimal() +
+  theme(legend.position = "none")  +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # bigger x-axis text
+    axis.text.y = element_text(size = 14),                        # bigger y-axis text
+    axis.title.x = element_text(size = 16),                       # bigger x-axis title
+    axis.title.y = element_text(size = 16)                        # bigger y-axis title
+  )
 
-# Create data frame for plotting
-plot_df <- data.frame(
-  x = c(1,2,3),
-  repeats = repeats,
-  singles1 = singles.1,
-  singles2 = singles.2,
-  singles3 = singles.3
+#Now look at community in repeated aliquots versus repeated samples.
+#What is community in A12+A121+A122, compared to community in
+##A12+A3+A4
+#A12+A13+A20
+#A12+A21+A5
+
+library(ggvenn)
+
+fungi_pa <- allfungi
+fungi_pa[fungi_pa > 0] <- 1
+
+#function to make heat map and venn
+make_venn_jaccard_heatmap <- function(df, group_list, plot_title = NULL) {
+  # Pool species in each group
+  pooled_groups <- lapply(group_list, function(samples) {
+    spp_present <- rowSums(df[, samples, drop = FALSE]) > 0
+    rownames(df)[spp_present]
+  })
+  
+  # Names for venn plot
+  names(pooled_groups) <- names(group_list)
+  
+  # Venn plot
+  print(
+    ggvenn(
+      pooled_groups,
+      show_percentage = FALSE,
+      set_name_size = 4,
+      text_size = 5
+    ) + ggtitle(plot_title)
+  )
+  
+  # Prepare presence absence matrix for Jaccard
+  all_species <- unique(unlist(pooled_groups))
+  to_pa_vector <- function(spp, all_spp) as.numeric(all_spp %in% spp)
+  
+  pa_matrix <- do.call(rbind, lapply(pooled_groups, to_pa_vector, all_spp = all_species))
+  rownames(pa_matrix) <- names(pooled_groups)
+  colnames(pa_matrix) <- all_species
+  
+  # Calculate Jaccard similarity (1 - distance)
+  jaccard_sim <- 1 - vegdist(pa_matrix, method = "jaccard", binary = TRUE)
+  jaccard_mat <- as.matrix(jaccard_sim)
+  
+  # Melt for heatmap plotting (lower triangle only)
+  jaccard_df <- melt(jaccard_mat)
+  colnames(jaccard_df) <- c("Group1", "Group2", "Similarity")
+  jaccard_df <- jaccard_df %>%
+    filter(as.numeric(factor(Group1)) >= as.numeric(factor(Group2)))
+  
+  # Heatmap plot
+  print(
+    ggplot(jaccard_df, aes(x = Group1, y = Group2, fill = Similarity)) +
+      geom_tile(color = "white") +
+      geom_text(aes(label = round(Similarity, 2)), size = 4) +
+      scale_fill_gradient(low = "white", high = "steelblue") +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title = element_blank()
+      ) +
+      coord_fixed() +
+      ggtitle(paste("Jaccard Similarity -", plot_title))
+  )
+} # end function
+
+# Define your 3 sets of groups
+
+set1 <- list(
+  G1_A12reps       = c("A12", "A121", "A122"),
+  G2_A12_A13_A20   = c("A12", "A13", "A20"),
+  G3_A12_A21_A5    = c("A12", "A21", "A5"),
+  G4_A12_A3_A4     = c("A12", "A3", "A4")
 )
 
-library(tidyr)
-df_long <- pivot_longer(plot_df, 
-                        cols = 2:5, 
-                        names_to = "Variable", 
-                        values_to = "Value")
+set2 <- list(
+  G1_A60reps       = c("A60", "A601", "A602"),
+  G2_A60_A61_A52   = c("A60", "A61", "A52"),
+  G3_A60_A59_A51   = c("A60", "A59", "A51"),
+  G4_A60_A53_A52   = c("A60", "A53", "A52")
+)
 
-ggplot(df_long, aes(x = x, y = Value, group = Variable, color = Variable)) +
-  geom_line() +
-  geom_point(size = 3) +
-  labs(title = "Cumulative Species Richness Across Samples, A12",
-       y = "Cumulative Number of Species",
-       x = "Sample") +
+set3 <- list(
+  G1_A34reps       = c("A34", "A341", "A342"),
+  G2_A34_A33_A25   = c("A34", "A33", "A25"),
+  G3_A34_A42_A43   = c("A34", "A42", "A43"),
+  G3_A34_A35_A26   =c("A34", "A35", "A26")
+)
+
+# Run function for each set - to make venn of subsequent aliquots from A samples
+
+make_venn_jaccard_heatmap(fungi_pa, set1, "Set 1: A12 Groups")
+make_venn_jaccard_heatmap(fungi_pa, set2, "Set 2: A60 Groups")
+make_venn_jaccard_heatmap(fungi_pa, set3, "Set 3: A34 Groups")
+
+#Final comparison for repeated aliquots is the B pooled samples#################
+#______________________________________________________________________________#
+#How does B1+B12+B13 compare to the set of 9 singles in the same area###########
+
+
+compare_groups <- function(df, group1_samples, group2_samples, title = "") {
+  # Pool species for each group
+  group1_species <- rownames(df)[rowSums(df[, group1_samples, drop = FALSE]) > 0]
+  group2_species <- rownames(df)[rowSums(df[, group2_samples, drop = FALSE]) > 0]
+  
+  # Combine species and calculate cumulative totals for plotting
+  species_union <- unique(c(group1_species, group2_species))
+  
+  # For cumulative species plot, order groups and plot cumulative totals
+  # Here, just two groups, so cumulative for group1, then cumulative for group1+group2 combined
+  
+  # cumulative species count in group1
+  cum_counts_group1 <- cumsum(sort(unique(group1_species)) %>% length())
+  # cumulative species count for combined (group1 + group2)
+  cum_counts_combined <- length(species_union)
+  
+  # Instead, let's do cumulative species by adding samples one by one for each group:
+  # So, for group1 samples
+  cum_species_counts <- function(samples) {
+    species_seen <- c()
+    cum_counts <- numeric(length(samples))
+    for (i in seq_along(samples)) {
+      spp_i <- rownames(df)[df[, samples[i]] == 1]
+      species_seen <- unique(c(species_seen, spp_i))
+      cum_counts[i] <- length(species_seen)
+    }
+    cum_counts
+  }
+  
+  cum_group1 <- cum_species_counts(group1_samples)
+  cum_group2 <- cum_species_counts(group2_samples)
+  
+  # Prepare data for ggplot
+  df_cum <- data.frame(
+    SampleNumber = c(seq_along(cum_group1), seq_along(cum_group2)),
+    CumulativeSpecies = c(cum_group1, cum_group2),
+    Group = rep(c("Group1", "Group2"), times = c(length(cum_group1), length(cum_group2)))
+  )
+  
+  # Plot cumulative species
+  p_cum <- ggplot(df_cum, aes(x = SampleNumber, y = CumulativeSpecies, color = Group)) +
+    geom_line(size = 1.2) + geom_point() +
+    labs(title = paste("Cumulative species -", title),
+         x = "Number of samples",
+         y = "Cumulative species count") +
+    theme_minimal() +
+    scale_color_manual(values = c("GroupB" = "blue", "GroupA" = "red"))
+  
+  print(p_cum)
+  
+  # Venn plot of pooled groups
+  venn_data <- list(
+    Group1 = group1_species,
+    Group2 = group2_species
+  )
+  print(ggvenn(venn_data, show_percentage = FALSE) + ggtitle(paste("Venn diagram -", title)))
+  
+  # Jaccard similarity (only 2 groups)
+  all_species <- unique(c(group1_species, group2_species))
+  to_pa_vector <- function(spp, all_spp) as.numeric(all_spp %in% spp)
+  pa_mat <- rbind(
+    Group1 = to_pa_vector(group1_species, all_species),
+    Group2 = to_pa_vector(group2_species, all_species)
+  )
+  
+  jaccard_sim <- 1 - vegdist(pa_mat, method = "jaccard", binary = TRUE)
+  jaccard_mat <- as.matrix(jaccard_sim)
+  jaccard_df <- melt(jaccard_mat)
+  colnames(jaccard_df) <- c("Group1", "Group2", "Similarity")
+  
+  # Heatmap plot (2x2 matrix, simple)
+  print(
+    ggplot(jaccard_df, aes(x = Group1, y = Group2, fill = Similarity)) +
+      geom_tile(color = "white") +
+      geom_text(aes(label = round(Similarity, 2)), size = 6) +
+      scale_fill_gradient(low = "white", high = "steelblue") +
+      theme_minimal() +
+      theme(axis.title = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust = 1)) +
+      coord_fixed() +
+      ggtitle(paste("Jaccard similarity -", title))
+  )
+}
+
+# Now define your groups and run the function
+
+# 1st comparison
+groupB1 <- c("B1", "B12", "B13")
+groupA1 <- c("A2", "A3", "A4", "A10", "A11","A12", "A18", "A19", "A20")
+
+# 2nd comparison
+groupB2 <- c("B2", "B22", "B23")
+groupA2 <- c("A17", "A23", "A24", "A25", "A31", "A32", "A33", "A39", "A40")
+
+# 3rd comparison
+groupB3 <- c("B3", "B32", "B33")
+groupA3 <- c("A41", "A47", "A48", "A49", "A55", "A56", "A57", "A62", "A63")
+
+# Run all 3
+compare_groups(fungi_pa, groupB1, groupA1, "B1 group vs A1 group")
+compare_groups(fungi_pa, groupB2, groupA2, "B2 group vs A2 group")
+compare_groups(fungi_pa, groupB3, groupA3, "B3 group vs A3 group")
+
+################################################################################
+#Finally, because I know someone will ask!
+#Which set of 3 A's is the Bs most similar to?
+################################################################################
+
+pool_species <- function(df, samples) {
+  spp_present <- rowSums(df[, samples, drop = FALSE]) > 0
+  rownames(df)[spp_present]
+}
+
+compare_b_vs_a_triplets <- function(df, b_samples, a_samples, b_name = "Bgroup", a_name = "Agroup") {
+  # Pool B samples once
+  b_species <- pool_species(df, b_samples)
+  
+  # Generate all combinations of 3 from A samples
+  a_triplets <- combn(a_samples, 3, simplify = FALSE)
+  
+  results <- lapply(a_triplets, function(triplet) {
+    a_species <- pool_species(df, triplet)
+    
+    all_species <- unique(c(b_species, a_species))
+    to_pa <- function(species_list, all_sp) as.numeric(all_sp %in% species_list)
+    b_pa <- to_pa(b_species, all_species)
+    a_pa <- to_pa(a_species, all_species)
+    
+    jaccard_sim <- 1 - vegdist(rbind(b_pa, a_pa), method = "jaccard", binary = TRUE)
+    similarity <- as.numeric(jaccard_sim)
+    
+    data.frame(
+      Bgroup = b_name,
+      Atriplet = paste(triplet, collapse = ","),
+      Jaccard = similarity
+    )
+  })
+  
+  
+  # Combine all results into one df
+  do.call(rbind, results)
+}
+
+# Example: define your groups
+b_samples1 <- c("B12", "B13")
+a_samples1 <- c("A2", "A3", "A4", "A10", "A11","A12", "A18", "A19", "A20")
+
+# Run the comparison
+jaccard_results <- compare_b_vs_a_triplets(fungi_pa, b_samples1, a_samples1, b_name = "B1", a_name = "A1")
+
+# View top 10 most similar triplets
+head(jaccard_results[order(-jaccard_results$Jaccard), ], 10)
+
+# Plot the distribution of Jaccard similarity by A triplet
+ggplot(jaccard_results, aes(x = reorder(Atriplet, Jaccard), y = Jaccard)) +
+  geom_point(color = "blue") +
+  coord_flip() +
+  labs(title = "Jaccard similarity between B group and A triplets",
+       x = "A triplet samples",
+       y = "Jaccard similarity") +
+  theme_minimal() +
+  theme(
+    axis.ticks.y = element_blank(),
+    axis.text.y = element_blank()
+  )
+
+#-------------------------
+# Can emf be monitored using soil eDNA
+#--------------------------
+
+#here we need to compare the root, rhizo and soil communities.
+#earlier box plots showed that the richness of the roots was lowest.
+#redo that and look at community
+
+#split emf species into soil, rhizo and root
+ecto_only <- allfungi %>%
+  filter(lifestyle == "ectomycorrhizal")
+
+# Step 2: identify sample columns for each group
+soil_samples  <- grep("^(A|B)", names(ecto_only), value = TRUE)
+rhizo_samples <- grep("^C",    names(ecto_only), value = TRUE)
+root_samples  <- grep("^R",    names(ecto_only), value = TRUE)
+
+# Step 3: calculate sample-level richness = number of species present in each sample
+sample_richness <- colSums(ecto_only[, c(soil_samples, rhizo_samples, root_samples)] > 0)
+
+# Step 4: create a dataframe with group labels
+richness_df <- data.frame(
+  sample   = names(sample_richness),
+  richness = sample_richness
+) %>%
+  mutate(group = case_when(
+    sample %in% soil_samples  ~ "Soil",
+    sample %in% rhizo_samples ~ "Rhizosphere",
+    sample %in% root_samples  ~ "Root"
+  ))
+
+# Step 5: barplot of mean richness ± SE
+ggplot(richness_df, aes(x = group, y = richness)) +
+  geom_bar(stat = "summary", fun = "mean",
+           fill = "lightblue", color = "black") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) +
+  theme_minimal() +
+  labs(title = "Mean Species Richness per Sample by Group",
+       x = "Group",
+       y = "Mean Species Richness ± SE")+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # bigger x-axis text
+    axis.text.y = element_text(size = 14),                        # bigger y-axis text
+    axis.title.x = element_text(size = 16),                       # bigger x-axis title
+    axis.title.y = element_text(size = 16)                        # bigger y-axis title
+  )
+
+############## heat maps #####################
+
+ecto_long <- ecto_groups_df %>%
+  pivot_longer(cols = c(Soil, Rhizosphere, Root),
+               names_to = "Habitat",
+               values_to = "Present") %>%
+  mutate(Present = ifelse(Present, 1, 0),
+         SpeciesName = paste(GENUS, Species)) %>%
+  group_by(SpeciesName) %>%
+  mutate(HabitatCount = sum(Present)) %>%
+  ungroup() %>%
+  mutate(SpeciesName = reorder(SpeciesName, HabitatCount))
+
+# Plot heatmap
+ggplot(ecto_long, aes(x = Habitat, y = SpeciesName, fill = factor(Present))) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("0" = "white", "1" = "steelblue"),
+                    name = "Presence",
+                    labels = c("Absent", "Present")) +
+  labs(x = "Habitat type", y = "Species",
+       title = "Ectomycorrhizal Species Presence Across Habitats") +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 10),   # small font for species names
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # bigger x-axis text
+    axis.text.y = element_text(size = 14),                        # bigger y-axis text
+    axis.title.x = element_text(size = 16),                       # bigger x-axis title
+    axis.title.y = element_text(size = 16)                        # bigger y-axis title
+  )
+
+###############################################################################
+#should compare species on root, to those in soil NEAR that root.
+#Sad to say, I think we lost the labelling regime for what 'birch' was, and there were 
+#2, so not sure which root goes with which. == 
+#look at pine first, R1.R2.R3. == C1,2,3
+#Maybe interesting to see which soil samples the root samples are most similar to
+#select each A soil sample
+#select each combined root sample # get Jaccard
+library(vegan)   # for vegdist
+
+# Step 1: extract relevant columns
+df <- allfungi_pa %>%
+  select(
+    Species,
+    matches("^A([1-9]$|[1-5][0-9]$|6[0-4]$)"),  # A1–A64 only
+    R4, R5, R6
+  )
+
+# Step 2: combine R1, R2, R3 into one pooled root sample
+df <- df %>%
+  mutate(Root = (R4 + R5 + R6) > 0) %>%   # TRUE/FALSE presence
+  select(-R4, -R5, -R6)
+
+# Step 3: create presence/absence matrix for Jaccard calculation
+pa_mat <- df %>%
+  select(-Species) %>% 
+  mutate(across(everything(), as.integer)) %>%   # ensure numeric 0/1
+  t()                                           # transpose: samples = rows
+
+# Step 4: compute Jaccard similarities
+# vegdist gives *dissimilarity*, so similarity = 1 - dissimilarity
+jaccard_dist <- vegdist(pa_mat, method = "jaccard", binary = TRUE)
+jaccard_sim <- 1 - as.matrix(jaccard_dist)
+
+# Step 5: extract similarities of Root with each A sample
+root_sims <- jaccard_sim["Root", grep("^A[0-9]+$", rownames(jaccard_sim))]
+
+# Inspect results
+top3 <- sort(root_sims, decreasing = TRUE)[1:3]
+top3
+bottom3 = sort(root_sims, decreasing = FALSE)[1:3]
+bottom3
+
+
+###occurrence for abundance ###################################################
+
+#take only samples in set A1:A64
+df = allfungi_pa[,c(3:7,41:99)]
+occurrence <- rowSums(df > 0)
+
+
+occ_df <- data.frame(occurrence = occurrence) |> 
+  subset(occurrence > 0)
+
+ggplot(occ_df, aes(x = occurrence)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
+  labs(
+    title = "Histogram of Species Occurrence",
+    x = "Number of Samples Present",
+    y = "Count of Species"
+  ) +
   theme_minimal()
 
+
+
+# Calculate total abundance (sum of reads across samples)
+df = allfungi[,c(3:7,41:99)]
+abundance <- rowSums(df)
+
+# Combine into a data frame
+plot_df <- data.frame(Species = rownames(df), Occurrence = occurrence, Abundance = abundance)
+
+# Plot scatter plot
+ggplot(plot_df, aes(x = Occurrence, y = Abundance)) +
+  geom_point(alpha = 0.6) +
+  scale_y_log10() +   # log scale helps if abundances vary widely
+  labs(title = "Species Occurrence vs Total Read Abundance",
+       x = "Number of Samples Present",
+       y = "Total Read Abundance (log scale)") +
+  theme_minimal()
+
+library(ggpmisc)  # for stat_poly_eq
+
+ggplot(plot_df, aes(x = Occurrence, y = Abundance)) +
+  geom_point(alpha = 0.6) +
+  scale_y_log10() +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  stat_poly_eq(
+    aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "~~~")),
+    formula = y ~ x,
+    parse = TRUE,
+    label.x.npc = "right",
+    label.y.npc = 0.15,
+    size = 5
+  ) +
+  labs(
+    title = "Species Occurrence vs Total Read Abundance",
+    x = "Number of Samples Present",
+    y = "Total Read Abundance (log scale)"
+  ) +
+  theme_minimal()
+
+
+ggplot(plot_df, aes(x = Occurrence, y = Abundance)) +
+  geom_point(alpha = 0.6) +
+  scale_y_log10() +   # keep y log scale as before
+  geom_smooth(method = "lm", formula = y ~ log(x), se = TRUE, color = "red") +
+  stat_poly_eq(
+    aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "~~~")),
+    formula = y ~ log(x),
+    parse = TRUE,
+    label.x.npc = "right",
+    label.y.npc = 0.15,
+    size = 5
+  ) +
+  labs(
+    title = "Species Occurrence vs Total Read Abundance (Log model)",
+    x = "Number of Samples Present",
+    y = "Total Read Abundance (log scale)"
+  ) +
+  theme_minimal()
+
+#Has to be mean abundance per sample because obvs correlated?????????????????????
+#i.e. if that spp crops up several times, its going to keep adding to total read abundance
+#if you take the mean abundance - i.e. sum its abundance across all samples
+#then divide by number of times it shows up. If its correlated, then are we always seeing same
+#ave read abundance each time??
+
+occurrence <- rowSums(df > 0)
+
+# Mean abundance per occupied sample:
+mean_abundance <- rowSums(df) / occurrence
+
+# Median abundance per occupied sample:
+median_abundance <- apply(df, 1, function(x) median(x[x > 0]))
+
+plot_df <- data.frame(
+  Species = rownames(df),
+  Occurrence = occurrence,
+  MeanAbundance = mean_abundance,
+  MedianAbundance = median_abundance
+)
+
+# Scatter plot of Occurrence vs Mean Abundance
+ggplot(plot_df, aes(x = Occurrence, y = MeanAbundance)) +
+  geom_point(alpha = 0.6) +
+  scale_y_log10() +
+  geom_smooth(method = "lm", se = TRUE, color = "darkgreen") +
+  stat_poly_eq(
+    aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "~~~")),
+    formula = y ~ x,
+    parse = TRUE,
+    label.x.npc = "right",
+    label.y.npc = 0.15,
+    size = 5
+  ) +
+  labs(
+    title = "",
+    x = "Number of Samples Present",
+    y = "Mean Abundance per Sample (log scale)"
+  ) +
+  theme_minimal()+
+  theme(
+    axis.title.x = element_text(size = 16),  # bigger x-axis title
+    axis.title.y = element_text(size = 16),  # bigger y-axis title
+    plot.title = element_text(size = 18, face = "bold") # optional: bigger title
+  )
+
+pearson_cor <- cor.test(plot_df$Occurrence, plot_df$MeanAbundance, method = "pearson")
+
+# Spearman correlation (rank-based, non-parametric)
+spearman_cor <- cor.test(plot_df$Occurrence, plot_df$MeanAbundance, method = "spearman")
+
+pearson_cor
+spearman_cor
+
+# Count samples in subset
+num_samples <- ncol(df)
+
+# Filter species present in at least half of the samples
+high_occurrence_species <- allfungi[occurrence >= (num_samples / 2), c("GENUS", "Species")]
+
+high_occurrence_species
+
+##or
+A_cols <- grep("^A([1-9]$|[1-5][0-9]$|6[0-4]$)", names(allfungi), value = TRUE)
+
+# Step 2: calculate how many A-samples each species is present in
+species_counts <- allfungi %>%
+  mutate(n_present = rowSums(select(., all_of(A_cols)) > 0)) %>%
+  select(GENUS, Species, n_present)
+
+# Step 3: filter for those present in 60, 62, 63, or 64 A-samples
+rare_universal <- species_counts %>%
+  filter(n_present %in% c(60, 62, 63, 64))
+
+rare_universal
+
+# try merging with the red list and see what we get.
+#need a Genus+species, and a frequency
+
+redlist =  read.csv('../../data/assessments.csv')
+df = allfungi[,c(1,2,3:7,41:99)]
+
+#for the red list can only merge complete species, so delete all rows where Species is sp
+
+df_complete_sp =  df %>% filter(Species != 'sp')
+#merge columns 1 and 2
+df_complete_sp <- df_complete_sp %>%
+  mutate(scientificName = paste(GENUS, Species, sep = " ")) %>%
+  select(scientificName, everything()) 
+
+#add occurrence column 
+# Step 1: identify the abundance columns
+abundance_cols <- paste0("A", 1:64)
+
+# Step 2: create Occurrence column
+df_complete_sp <- df_complete_sp %>%
+  mutate(Occurrence = rowSums(select(., all_of(abundance_cols)) > 0))
+
+df_complete_sp_nozero =  df_complete_sp %>% filter(Occurrence>0)
+
+spp_occ <- df_complete_sp %>%
+  select(scientificName, Occurrence)
+
+
+site_redlist <- spp_occ %>%
+  left_join(redlist %>% select(scientificName, redlistCategory),
+            by = "scientificName")
+
+#Simpsons from occurrence####
+
+abundance_cols <- paste0("A", 1:64)
+
+occurrence_mat <- df_complete_sp %>%
+  select(all_of(abundance_cols))
+
+# Step 2: pool across samples (sum counts for each species)
+# If you want presence/absence, use >0 instead of sum
+pooled_occurrence <- rowSums(occurrence_mat > 0)  # presence across samples
+
+# Step 3: calculate site-wide Simpson’s diversity
+simpson_site <- diversity(pooled_occurrence, index = "simpson")
+
+simpson_site
+
+redlist %>%
+  filter(redlistCategory == "Data Deficient") %>%
+  summarise(n = n())
+
+
+###############################################################################
+
+#look at spatial structure. Take data1 whhich is all single samples, assign postiions, 1,1
+#,1,2 etc for the rows - to show where each one was in the sampling matrix
+
+#read in locs
+locs = read_xlsx('../../data/DelamereData.xlsx', sheet = 'locs')
+
+#reorganise for spatial similarity
+species_data = as.data.frame(t(data1))
+coords <- locs[, c("col", "row")]   # x = col, y = row
+rownames(coords) <- locs$sample  
+coords <- coords[rownames(species_data), ]
+
+library(vegan)
+comm_dist <- vegdist(species_data, method = "jaccard")
+spatial_dist <- dist(coords) 
+
+mantel_result <- mantel(comm_dist, spatial_dist, method = "spearman", permutations = 999)
+print(mantel_result)
+
+# Create a data frame for plotting
+df_plot <- data.frame(
+  distance = as.vector(spatial_dist),
+  similarity = 1 - as.vector(comm_dist)  # convert dissimilarity to similarity
+)
+
+ggplot(df_plot, aes(x = distance, y = similarity)) +
+  geom_point(alpha = 0.6) +               # scatter points
+  geom_smooth(method = "loess", se = TRUE, color = "blue") +  # trend line
+  labs(
+    x = "Distance (grid units)",
+    y = "Jaccard similarity",
+    title = "Spatial similarity of samples"
+  ) +
+  theme_minimal(base_size = 14)

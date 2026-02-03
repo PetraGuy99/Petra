@@ -1,0 +1,592 @@
+---
+title: "Elsoms Run 2"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    keep_tex: true
+    
+---
+
+```{r setup, include=FALSE, message = F}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  library(ggpubr)
+  library(ggplot2)
+  
+  knitr::opts_chunk$set(echo = FALSE)
+})
+```
+
+This analysis summarizes Elsoms run 2. Nursery Trials/Experiments/Run 1/Elsoms Run 2 Results
+
+
+
+
+The first few charts look at oak mortality. The oaks were very mildewed and I had almost decided to omit them from the experiment. However, I did a mortality check first. Some trees had died immediately on planting, and this number is deducted from the total number of trees per tray. The mortality is then the number of trees which died subsequently/this reduced starting number
+
+```{r, echo=FALSE, warning=FALSE, message = F}
+#load the oak data
+oak = read_xlsx('../../../data/nursery/NurseryRun2.xlsx', sheet = 'Oak', col_names = T)
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+##MORTALITY WITH DROUGHT EFFECT
+
+# mortality = count "n" entries
+
+# assume each group starts with 40 trees
+starting_trees <- 80
+
+
+#remove the trees which died immedialte and calculate % mortality with the ones that died later
+mort_per_group <- oak %>%
+  group_by(Fungi, Drought) %>%
+  summarise(
+    dead_immediately = sum(Dead_Immediately == "y", na.rm = TRUE),
+    dead_later      = sum(Dead_Immediately == "n", na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    adjusted_total = starting_trees - dead_immediately,    # trees remaining after immediate deaths
+    mortality_percent = dead_later / adjusted_total * 100 # % mortality from the remaining trees
+  )%>%
+  mutate(GroupType = ifelse(tolower(Fungi) == "control", "Control", "Treatment"))
+# create a unique combination of Fungi x Drought for fill
+mort_per_group$Group <- paste(mort_per_group$Fungi, mort_per_group$Drought, sep = "_")
+
+# define colours: control = orange/darkorange, others = green shades
+cols <- c(
+  # Control
+  "control_Drought" = "darkorange",
+  "control_Non"     = "moccasin",
+  
+  # Treatments
+  "scl_Drought"     = "forestgreen",
+  "scl_Non"         = "palegreen",
+  "lac_Drought"     = "forestgreen",
+  "lac_Non"         = "palegreen",
+  "lact_Drought"    = "forestgreen",
+  "lact_Non"        = "palegreen",
+  "heb_Drought"     = "forestgreen",
+  "heb_Non"         = "palegreen",
+  "pax_Drought"     = "forestgreen",
+  "pax_Non"         = "palegreen",
+  "sui_Drought"     = "forestgreen",
+  "sui_Non"         = "palegreen"
+)
+
+
+
+# Pick representative Groups for the legend
+legend_breaks <- c(
+  "control_Drought",
+  "control_Non",
+  "scl_Drought",    # any treatment Drought
+  "scl_Non"         # any treatment Non
+)
+
+legend_labels <- c(
+  "Drought (Control)",
+  "Non-drought (Control)",
+  "Drought (Treatment)",
+  "Non-drought (Treatment)"
+)
+
+# Plot
+ggplot(mort_per_group, aes(x = Fungi, y = mortality_percent, fill = Group)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(
+    values = cols,
+    breaks = legend_breaks,
+    labels = legend_labels
+  ) +
+  labs(title = "Mortality by Drought x Fungal Treatment",
+       x = "Fungal treatment",
+       y = "%",
+       fill = "") +  # optional: remove legend title
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Fig caption: Control, trees which received no inoculum. Treatment, these trees received liquid innoculum of 6 different emf, heb = *Hebeloma spp*, lac = *Laccaria bicolor*, lact = *Lactarius torminosus*, pax = *Paxillus involutus*, scl = *Scleroderma areolatum*, sui = *Suillus bovinus*
+
+
+If the droughting is to be believed, and this is an issue, because it was an oversight by Elsoms rather than a controlled experiment, then the emf only had an impact on mortality in the droughting treatment. This data may be useful to inform future runs - but perhaps used with caution with customers. Next graph combines all the oaks ignoring the droughting treatment.
+
+```{r, echo=FALSE, warning=FALSE}
+
+#MORTALITY IGNORE DROUGHT
+#redo the above graph but ignore the drought/non drought because we don't have a measure for that variable
+# we just know that the 'drought table' did not get watered properly.
+#Also - take account for the fact that each group had a different starting number of trees because some in each tray died immediately on planting. So starting number reduced by 40 - dead immediately
+
+# mortality = count "n" entries
+library(dplyr)
+library(ggplot2)
+
+# assume each group starts with 40 trees
+starting_trees <- 80
+
+
+mort_per_group <- oak %>%
+  group_by(Fungi) %>%
+  summarise(
+    dead_immediately = sum(Dead_Immediately == "y", na.rm = TRUE),
+    dead_later      = sum(Dead_Immediately == "n", na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    adjusted_total = starting_trees - dead_immediately,    # trees remaining after immediate deaths
+    mortality_percent = dead_later / adjusted_total * 100 # % mortality from the remaining trees
+  )%>%
+  mutate(GroupType = ifelse(tolower(Fungi) == "control", "Control", "Treatment"))
+
+
+# Define colours for Control vs Treatment
+cols <- c(
+  "Control" = "orange",
+  "Treatment" = "forestgreen"
+)
+
+# Plot
+ggplot(mort_per_group, aes(x = Fungi, y = mortality_percent, fill = GroupType)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = cols) +
+  labs(title = "Mortality by Fungal Treatment",
+       x = "Fungal treatment",
+       y = "Mortality (%)",
+       fill = "") +  # remove legend title
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+Fig caption: Control, trees which received no innoculum. Treatment, these trees received liquid innoculum of 6 different emf, heb = *Hebeloma spp*, lac = *Laccaria bicolor*, lact = *Lactarius torminosus*, pax = *Paxillus involutus*, scl = *Scleroderma areolatum*, sui = *Suillus bovinus*
+
+Above we ignore whether the trays were on the droughted or non-droughted bench. Since some of the trees died immediately on the same day as planting, these were removed from the analysis as this was not related to treatment. each group then has slightly different starting number of trees and mortality is calculated as number of trees which subsequently died/(80-number which died immediately)
+
+
+
+Fig caption: Control, trees which received no innoculum. Treatment, these trees received liquid innoculum of 6 different emf, heb = *Hebeloma spp*, lac = *Laccaria bicolor*, lact = *Lactarius torminosus*, pax = *Paxillus involutus*, scl = *Scleroderma areolatum*, sui = *Suillus bovinus*. The stars represent the significance of a Welch's t test with ** p <= 0.01, \*\*\* p <= 0.001. Applied emf gives a significant change in height for Lactarius, Paxillus and Scleroderma. Note that we do not expect a difference for Suillus, this treatment included partially as cross check and partially to keep teratments equal across all tree species tested. Seeing an effect for Suillus may have alerted us to some other unmeasured effect
+
+
+
+Here is above splitting into drought and non-drought
+
+```{r, echo=FALSE, warning=FALSE, message = F}
+
+
+#MEAN CHANGE IN HEAIGHT BAR CHARTS WITH DROUGHT WITH T TESTS
+
+library(dplyr)
+library(ggplot2)
+library(rstatix)
+library(tidyr)
+library(broom)
+
+# Keep only surviving trees (Dead_Immediately NA)
+deltaH_data <- oak %>% filter(is.na(Dead_Immediately))
+
+# Make grouping variable
+deltaH_data <- deltaH_data %>%
+  mutate(
+    Group = paste(Fungi, Drought, sep = "_")
+  )
+
+deltaH_summary <- deltaH_data %>%
+  group_by(Fungi, Drought, Group) %>%
+  summarise(
+    mean_DeltaH = mean(Delta_H, na.rm = TRUE),
+    se_DeltaH   = sd(Delta_H, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  )
+
+fungi <- c("heb","lac","lact","pax","scl","sui")
+
+pairwise_tests <- bind_rows(
+  lapply(fungi, function(f){
+    bind_rows(
+      # drought only
+      deltaH_data %>%
+        filter(Fungi %in% c("control", f),
+               Drought == "Drought") %>%
+        t_test(Delta_H ~ Fungi, var.equal = FALSE) %>%
+        add_significance() %>%
+        mutate(Fungi = f,
+               Drought = "Drought"),
+
+      # non-drought only
+      deltaH_data %>%
+        filter(Fungi %in% c("control", f),
+               Drought == "Non") %>%
+        t_test(Delta_H ~ Fungi, var.equal = FALSE) %>%
+        add_significance() %>%
+        mutate(Fungi = f,
+               Drought = "Non")
+    )
+  })
+)
+
+pairwise_tests <- pairwise_tests %>%
+  mutate(
+    stars = case_when(
+      p<= 0.001 ~ "***",
+      p <= 0.01  ~ "**",
+      p<= 0.05  ~ "*",
+      TRUE            ~ ""      # replace "ns" with empty string
+    )
+  )
+
+
+
+cols <- c(
+  "control_Drought" = "darkorange",
+  "control_Non"     = "moccasin",
+  "scl_Drought"     = "forestgreen",
+  "scl_Non"         = "palegreen",
+  "lac_Drought"     = "forestgreen",
+  "lac_Non"         = "palegreen",
+  "lact_Drought"    = "forestgreen",
+  "lact_Non"        = "palegreen",
+  "heb_Drought"     = "forestgreen",
+  "heb_Non"         = "palegreen",
+  "pax_Drought"     = "forestgreen",
+  "pax_Non"         = "palegreen",
+  "sui_Drought"     = "forestgreen",
+  "sui_Non"         = "palegreen"
+)
+
+legend_breaks <- c(
+  "control_Drought",
+  "control_Non",
+  "scl_Drought",
+  "scl_Non"
+)
+
+legend_labels <- c(
+  "Drought (Control)",
+  "Non-drought (Control)",
+  "Drought (Treatment)",
+  "Non-drought (Treatment)"
+)
+
+# Join stars to summary data for plotting
+star_positions <- deltaH_summary %>%
+  left_join(pairwise_tests %>% select(Fungi, Drought, stars),
+            by = c("Fungi", "Drought")) %>%
+  mutate(
+    y_pos = mean_DeltaH + se_DeltaH + 0.5  # adjust height above bar
+  )
+
+# Plot
+ggplot(deltaH_summary,
+       aes(x = Fungi, y = mean_DeltaH, fill = Group)) +
+  geom_col(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = mean_DeltaH - se_DeltaH,
+                    ymax = mean_DeltaH + se_DeltaH),
+                width = 0.2, position = position_dodge(width = 0.9)) +
+  geom_text(data = star_positions,
+            aes(x = Fungi, y = y_pos, label = stars),
+            inherit.aes = FALSE, size = 5) +
+  scale_fill_manual(values = cols,
+                    breaks = legend_breaks,
+                    labels = legend_labels) +
+  labs(title = "Mean Change in Height by Drought × Fungal Treatment",
+       x = "Fungal treatment",
+       y = "Mean ΔH (cm)",
+       fill = "") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+```
+Fig caption: Control, trees which received no innoculum. Treatment, these trees received liquid innoculum of 6 different emf, heb = *Hebeloma spp*, lac = *Laccaria bicolor*, lact = *Lactarius torminosus*, pax = *Paxillus involutus*, scl = *Scleroderma areolatum*, sui = *Suillus bovinus*. The stars represent the significance of a Welch's t test with ** p <= 0.01, \*\*\* p <= 0.001. 
+
+When we also split out the drought and non drought we have the same pattern of lactarius, paxillus and scleroderma giving significant changes in height, so whilst the droughting may influence mortality, it does not appear to influence change in height.
+
+Cleaner here to run a lm with droughting as an effect as multipl pairwise t tests can inflate type 1 errors
+
+```{r, echo=FALSE, warning=FALSE, message = F}
+
+#MEAN CHANGE IN HEIGHT BUT USING LM TO AVOID INFLATING TYPE 1 ERRORS
+
+library(dplyr)
+library(ggplot2)
+library(emmeans)
+
+# --- 1. Keep only surviving trees ---
+deltaH_data <- oak %>% filter(is.na(Dead_Immediately))
+
+# Ensure factors
+deltaH_data <- deltaH_data %>%
+  mutate(
+    Fungi = factor(Fungi),
+    Drought = factor(Drought),
+    Group = paste(Fungi, Drought, sep = "_")
+  )
+
+# --- 2. Fit linear model ---
+lm_model <- lm(Delta_H ~ Fungi * Drought, data = deltaH_data)
+
+# --- 3. Estimated marginal means ---
+emm <- emmeans(lm_model, ~ Fungi | Drought)
+
+# Convert to data frame for plotting
+plot_data <- as.data.frame(emm) %>%
+  mutate(
+    GroupType = ifelse(Fungi == "control", "Control", "Treatment"),
+    Group = paste(Fungi, Drought, sep = "_")
+  )
+
+# --- 4. Pairwise comparisons of each treatment vs control ---
+pairwise_tests <- contrast(emm, method = "trt.vs.ctrl", ref = "control") %>%
+  summary(infer = TRUE) %>%
+  mutate(
+    # Extract the Drought info from emmeans
+    Drought = rep(levels(deltaH_data$Drought), times = length(unique(deltaH_data$Fungi)) - 1),
+    stars = case_when(
+      p.value <= 0.001 ~ "***",
+      p.value <= 0.01  ~ "**",
+      p.value <= 0.05  ~ "*",
+      TRUE             ~ ""  # remove ns
+    ),
+    Fungi = gsub(" - control", "", contrast)  # treatment name
+  )
+
+# --- 5. Join stars to plotting data ---
+star_positions <- plot_data %>%
+  left_join(pairwise_tests %>% select(Fungi, Drought, stars),
+            by = c("Fungi", "Drought")) %>%
+  mutate(y_pos = emmean + SE + 0.5)  # adjust vertical position above bar
+
+# --- 6. Colours ---
+cols <- c(
+  "control_Drought" = "darkorange",
+  "control_Non"     = "moccasin",
+  "scl_Drought"     = "forestgreen",
+  "scl_Non"         = "palegreen",
+  "lac_Drought"     = "forestgreen",
+  "lac_Non"         = "palegreen",
+  "lact_Drought"    = "forestgreen",
+  "lact_Non"        = "palegreen",
+  "heb_Drought"     = "forestgreen",
+  "heb_Non"         = "palegreen",
+  "pax_Drought"     = "forestgreen",
+  "pax_Non"         = "palegreen",
+  "sui_Drought"     = "forestgreen",
+  "sui_Non"         = "palegreen"
+)
+
+legend_breaks <- c(
+  "control_Drought", "control_Non",
+  "scl_Drought", "scl_Non"
+)
+
+legend_labels <- c(
+  "Drought (Control)", "Non-drought (Control)",
+  "Drought (Treatment)", "Non-drought (Treatment)"
+)
+
+# --- 7. Plot ---
+ggplot(plot_data, aes(x = Fungi, y = emmean, fill = Group)) +
+  geom_col(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.9)) +
+  geom_text(data = star_positions,
+            aes(x = Fungi, y = y_pos, label = stars),
+            inherit.aes = FALSE, size = 5) +
+  scale_fill_manual(values = cols,
+                    breaks = legend_breaks,
+                    labels = legend_labels) +
+  labs(title = "Mean Change in Height by Drought × Fungal Treatment (LM-based)",
+       x = "Fungal treatment",
+       y = "Mean ΔH (cm)",
+       fill = "") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+```
+Linear model, main effects are fungi and drought, interaction effect of drought (i,e, how each fungi responds differently under drought vs non drought). 
+Estimated marginal means (lm_model ~ Fungi | Drought ) - this is delta H of lact for each drought level, estimated by the model - not just the raw average. 
+Contrast(emm) compares model adjusted mean of lact under drought to model adjusted mean of control under drought - similarly for non-drought. 
+
+
+```{r, echo=FALSE, warning=FALSE, message = F}
+
+#MEAN CHANGHE IN HEIGHT IGNORING DORUGHT USING T TESTS
+
+library(dplyr)
+library(ggplot2)
+library(rstatix)
+library(tidyr)
+
+# Keep only surviving trees (Dead_Immediately NA)
+deltaH_data <- oak %>% filter(is.na(Dead_Immediately))
+
+# Make sure Fungi is a factor
+deltaH_data$Fungi <- factor(deltaH_data$Fungi)
+
+# Summary stats for bars
+deltaH_summary <- deltaH_data %>%
+  group_by(Fungi) %>%
+  summarise(
+    mean_DeltaH = mean(Delta_H, na.rm = TRUE),
+    se_DeltaH   = sd(Delta_H, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  mutate(GroupType = ifelse(tolower(Fungi) == "control", "Control", "Treatment"))
+
+# List of treatments (exclude control)
+treatments <- c("heb", "lac", "lact", "pax", "scl", "sui")
+
+# Run pairwise t-tests of each treatment vs control
+pairwise_tests <- lapply(treatments, function(trt) {
+  trt_data <- deltaH_data %>% filter(Fungi %in% c(trt, "control"))
+  t.test(Delta_H ~ Fungi, data = trt_data) %>%
+    broom::tidy() %>%
+    mutate(Fungi = trt)
+}) %>%
+  bind_rows() %>%
+  mutate(
+    stars = case_when(
+      p.value <= 0.001 ~ "***",
+      p.value <= 0.01  ~ "**",
+      p.value <= 0.05  ~ "*",
+      TRUE             ~ ""
+    )
+  )
+
+# Join stars to summary data for plotting
+star_positions <- deltaH_summary %>%
+  left_join(pairwise_tests %>% select(Fungi, stars), by = "Fungi") %>%
+  mutate(
+    y_pos = mean_DeltaH + se_DeltaH + 0.5  # adjust as needed
+  )
+
+# Colours
+cols <- c("Control" = "orange", "Treatment" = "forestgreen")
+
+# Plot
+ggplot(deltaH_summary, aes(x = Fungi, y = mean_DeltaH, fill = GroupType)) +
+  geom_col(position = "dodge") +
+  geom_errorbar(aes(ymin = mean_DeltaH - se_DeltaH,
+                    ymax = mean_DeltaH + se_DeltaH),
+                width = 0.2) +
+  geom_text(data = star_positions, aes(x = Fungi, y = y_pos, label = stars),
+            inherit.aes = FALSE, size = 5) +
+  scale_fill_manual(values = cols) +
+  labs(title = "Mean Delta_H by Fungal Treatment",
+       x = "Fungal treatment",
+       y = "Mean Delta_H",
+       fill = "") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, message = F}
+
+library(dplyr)
+library(ggplot2)
+library(emmeans)
+
+# Keep only surviving trees
+deltaH_data <- oak %>% filter(is.na(Dead_Immediately))
+
+# Make Fungi a factor
+deltaH_data <- deltaH_data %>%
+  mutate(Fungi = factor(Fungi))
+
+# Fit linear model ignoring drought
+lm_model <- lm(Delta_H ~ Fungi, data = deltaH_data)
+
+# Estimated marginal means (EMMs)
+emm <- emmeans(lm_model, ~ Fungi)
+
+# Pairwise comparisons vs control
+contr <- contrast(emm, method = "trt.vs.ctrl", ref = "control") %>%
+  summary(infer = TRUE) %>%
+  mutate(
+    Fungi = sub(" - control", "", contrast),  # extract fungus name
+    stars = case_when(
+      p.value <= 0.001 ~ "***",
+      p.value <= 0.01  ~ "**",
+      p.value <= 0.05  ~ "*",
+      TRUE             ~ ""
+    )
+  )
+
+# Convert EMMs to a data frame for plotting
+plot_data <- as.data.frame(emm) %>%
+  mutate(GroupType = ifelse(tolower(Fungi) == "control", "Control", "Treatment"))
+
+# Join stars to plotting data
+plot_data <- plot_data %>%
+  left_join(contr %>% select(Fungi, stars), by = "Fungi") %>%
+  mutate(y_pos = emmean + SE + 0.5)  # position of stars above bars
+
+# Assign colors
+plot_data <- plot_data %>%
+  mutate(fill_color = ifelse(GroupType == "Control", "orange", "forestgreen"))
+
+# Plot
+ggplot(plot_data, aes(x = Fungi, y = emmean, fill = fill_color)) +
+  geom_col(position = "dodge") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2) +
+  geom_text(aes(y = y_pos, label = stars), size = 5) +
+  scale_fill_identity(guide = "legend",
+                      labels = c("Control","Treatment"),
+                      breaks = c("orange","forestgreen")) +
+  labs(title = "Mean ΔH by Fungal Treatment ",
+       x = "Fungal treatment",
+       y = "Mean ΔH (cm)",
+       fill = "") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+```{r, echo=FALSE, warning=FALSE, message = F}
+
+#CHECK THE VARIANCE ETC AND PLOT VIOLIN PLOTS
+
+library(kableExtra)
+
+deltaH_summary <- deltaH_data %>%
+  group_by(Fungi) %>%
+  summarise(
+    n = n(),
+    `Mean Delta H (cm)` = round(mean(Delta_H, na.rm = TRUE), 2),
+    `SD (cm)` = round(sd(Delta_H, na.rm = TRUE), 2),
+    `Variance` = round(var(Delta_H, na.rm = TRUE), 2),
+    .groups = "drop"
+  )
+
+# Print nicely (fast, PDF/HTML safe)
+deltaH_summary %>%
+  kable(booktabs = TRUE, caption = "Summary of Delta H by Fungal Treatment")
+
+ggplot(deltaH_data, aes(x = Fungi, y = Delta_H, fill = Fungi)) +
+  geom_violin(trim = FALSE, alpha = 0.5) +
+  geom_boxplot(width = 0.1, position = position_dodge(0.9), outlier.shape = NA) +
+  stat_summary(fun = mean, geom = "point", shape = 20, size = 3, color = "black") +
+  labs(title = "Distribution of delta_H by Fungal Treatment",
+       x = "Fungal treatment",
+       y = "Change in height (cm)") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none"
+)
+```
+

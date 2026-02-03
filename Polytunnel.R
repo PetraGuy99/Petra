@@ -101,3 +101,40 @@ ggplot(df, aes(x = Treatment, y = Survival, fill = Treatment)) +
        x = "",
        y = "% survival") +
   theme_minimal(base_size = 24)
+
+###############################################################################
+
+#redoing polytunnel data for Pine - to compile into one report with the root
+#colonisation work
+#Need to see if root colonisation method is useful way of quantifying emf on roots
+#and if there is any correlation with N levels
+
+###############################################################################
+
+data = read.csv('../../data/polytunnelsummaryall.csv')
+
+df_summary <- data %>%
+  group_by(N, size, treatment) %>%
+  summarise(total_aver_count = sum(ave_count, na.rm = TRUE), .groups = "drop")
+
+ggplot(df_summary, aes(x = factor(N), y = total_aver_count, fill = factor(size))) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~treatment)+
+  labs(x = "N", y = "Total aver_count", fill = "Size") +
+  theme_minimal()
+
+
+#look at it without type 1 - assuming they are not the SUI
+
+df_summary <- data %>%
+  filter(type != 1) %>%                     # remove type 1
+  group_by(N, size, treatment) %>%
+  summarise(total_aver_count = sum(ave_count, na.rm = TRUE), .groups = "drop")
+
+ggplot(df_summary, aes(x = factor(N), y = total_aver_count, fill = factor(size))) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ treatment) +
+  labs(x = "N", y = "Total aver_count", fill = "Size") +
+  theme_minimal()
+
+

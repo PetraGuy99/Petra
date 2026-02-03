@@ -1,0 +1,344 @@
+---
+title: "Coilte Final Report"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  library(ggpubr)
+  library(ggplot2)
+ library(nlme)
+  
+  knitr::opts_chunk$set(echo = FALSE)
+})
+```
+
+
+This is the analysis for Coillte/Sonnagh in Eire, monitored May 1st 2023, April 29th 2024 and finally November 16th 2025. Not all plots were measured in 2025 due to lack of time, so we have 2 time points for plots 4a,7, 4b, 5a, 6 and 3 time points for 8a/8b, 5b1,5b2,5c1,5c2
+
+```{r, echo=FALSE, warning=FALSE}
+
+#two time point data
+data2 = read_excel('../../../data/field/Coillte2025.xlsx',sheet = 'RData2')
+data3 =read_excel('../../../data/field/Coillte2025.xlsx',sheet = 'RData3')
+
+#add change in height column for 2 time point data
+
+data2$Delta_h = data2$Height_1-data2$Height_0
+
+#negative values in change in height are due to a) error 2) dead tops
+#anything of less than 5 cm probably a measurement error and implies very little growth -
+#therefore all values <5 will be set to 0 and denote no measurable growth
+#any delta_h above 5 will be omitted as dead tops which will distort change in height #data
+
+#flag for DT - dead top - stored in separate column, then count of NAs for mortality can 
+#separated from count of NAs for dead top
+data2 <- data2 %>%
+  mutate(
+    Delta_h_new = case_when(
+      Delta_h <= -6                     ~ NA_real_,
+      Delta_h <= -1 & Delta_h >= -5     ~ 0,
+      TRUE                              ~ Delta_h
+    ),
+    Delta_h_flag = case_when(
+      Delta_h <= -6 ~ "DT",
+      TRUE          ~ NA_character_
+    )
+  )
+
+
+```
+
+Summarize average change in heights by tree species/treatment
+
+```{r, echo=FALSE, warning=FALSE}
+
+library(dplyr)
+# Summarise first - ignoring block
+height_summary <- data2 %>%
+  group_by(Tree_species, Treatment) %>%
+  summarise(
+    mean_delta_h = mean(Delta_h_new, na.rm = TRUE),
+    sd_delta_h = sd(Delta_h_new, na.rm = TRUE),
+    n = sum(!is.na(Delta_h_new)),
+    se = sd_delta_h / sqrt(n),
+    .groups = "drop"
+  )
+
+ggplot(height_summary, aes(x = Tree_species, y = mean_delta_h, fill = Treatment)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(aes(ymin = mean_delta_h - se, ymax = mean_delta_h + se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = c("Control" = "orange", "Pellet" = "forestgreen")) +
+  labs(
+    x = "Tree Species",
+    y = "Mean Height Change",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+# ------------------------------
+# 2️⃣ Clean data: select relevant columns and remove NAs
+# ------------------------------
+data_clean <- data2 %>%
+  select(Delta_h_new, Tree_species, Treatment, Block) %>%
+  na.omit() %>%
+  mutate(
+    Tree_species = as.factor(Tree_species),
+    Treatment = as.factor(Treatment),
+    Block = as.factor(Block)  # Must be a factor
+  )
+
+# ------------------------------
+# 3️⃣ Summarise Δheight for plotting (mean ± SE)
+# ------------------------------
+height_summary <- data_clean %>%
+  group_by(Tree_species, Treatment) %>%
+  summarise(
+    mean_delta_h = mean(Delta_h_new, na.rm = TRUE),
+    sd = sd(Delta_h_new, na.rm = TRUE),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+# ------------------------------
+# 4️⃣ Plot mean ± SE
+# ------------------------------
+ggplot(height_summary, aes(x = Tree_species, y = mean_delta_h, fill = Treatment)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(aes(ymin = mean_delta_h - se, ymax = mean_delta_h + se),
+                position = position_dodge(width = 0.8),
+                width = 0.2) +
+  scale_fill_manual(values = c("Control" = "orange", "Pellet" = "forestgreen")) +
+  labs(
+    x = "Tree Species",
+    y = "Mean Height Change",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 14)
+
+# ------------------------------
+# 5️⃣ Fit mixed-effects model with Block as random effect
+# ------------------------------
+model_block <- lme(
+  Delta_h_new ~ Tree_species * Treatment,
+  random = ~1 | Block,   # random intercept for Block
+  data = data_clean,
+  na.action = na.omit
+)
+
+
+# ------------------------------
+# 6️⃣ Fixed effects ANOVA
+# ------------------------------
+anova_fixed <- anova(model_block)
+print("Fixed effects ANOVA:")
+print(anova_fixed)
+
+# ------------------------------
+# 7️⃣ Random effect variance (Block)
+# ------------------------------
+block_var <- VarCorr(model_block)
+print("Random effect variance (Block and Residual):")
+print(block_var)
+
+# ------------------------------
+# 8️⃣ Test if Block is significant
+# ------------------------------
+# Fit a null model with no Block (random = ~1 | 1)
+model_noblock <- lm(Delta_h_new ~ Tree_species * Treatment, data = data_clean)
+
+anova(model_block)         # fixed effects table
+VarCorr(model_block)       # block variance
+
+block_var <- VarCorr(model_block)
+
+# Random effect variance (Block)
+block_variance <- as.numeric(block_var[1, "Variance"])
+block_sd <- sqrt(block_variance)
+
+# Residual variance
+resid_variance <- as.numeric(block_var["Residual", "Variance"])
+resid_sd <- sqrt(resid_variance)
+
+block_variance
+block_sd
+resid_variance
+resid_sd
+
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+#model assumptions
+
+# Extract residuals and fitted values
+residuals_lme <- resid(model_block, type = "pearson")
+fitted_lme <- fitted(model_block)
+
+# Plot residuals vs fitted
+plot(fitted_lme, residuals_lme,
+     xlab = "Fitted values", ylab = "Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+#looking for random scatter - 
+
+qqnorm(residuals_lme)
+qqline(residuals_lme, col = "red")
+
+#normality looking for ~ straight line
+
+acf(residuals_lme, main = "ACF of residuals")
+#independence of residuals
+
+# Extract block-level random effects
+block_effects <- ranef(model_block)$Block
+
+boxplot(residuals_lme ~ data_clean$Treatment,
+        main = "Residuals by Treatment")
+boxplot(residuals_lme ~ data_clean$Tree_species,
+        main = "Residuals by Tree Species")
+#normally distributed block effects
+```
+
+The model validation suggests heteroscedasticity in the data as seen in the residual versus fitted plots and the box plots of residuals across tree species and the S shape of the qq plot
+
+First try adding weights
+
+```{r, echo=FALSE, warning=FALSE}
+# ------------------------------
+# 2️⃣ Clean data: select relevant columns and remove NAs
+# ------------------------------
+data_clean <- data2 %>%
+  select(Delta_h_new, Tree_species, Treatment, Block) %>%
+  na.omit() %>%
+  mutate(
+    Tree_species = as.factor(Tree_species),
+    Treatment = as.factor(Treatment),
+    Block = as.factor(Block)  # Must be a factor
+  )
+
+model_block <- lme(
+  Delta_h_new ~ Tree_species * Treatment,
+  random = ~1 | Block,
+  data = data_clean,
+  weights = varIdent(form = ~1 | Tree_species) # weights
+)
+
+
+
+# ------------------------------
+# 6️⃣ Fixed effects ANOVA
+# ------------------------------
+anova_fixed <- anova(model_block)
+print("Fixed effects ANOVA:")
+print(anova_fixed)
+
+# ------------------------------
+# 7️⃣ Random effect variance (Block)
+# ------------------------------
+block_var <- VarCorr(model_block)
+print("Random effect variance (Block and Residual):")
+print(block_var)
+
+# ------------------------------
+# 8️⃣ Test if Block is significant
+# ------------------------------
+# Fit a null model with no Block (random = ~1 | 1)
+model_noblock <- lm(Delta_h_new ~ Tree_species * Treatment, data = data_clean)
+
+anova(model_block)         # fixed effects table
+VarCorr(model_block)       # block variance
+
+block_var <- VarCorr(model_block)
+
+# Random effect variance (Block)
+block_variance <- as.numeric(block_var[1, "Variance"])
+block_sd <- sqrt(block_variance)
+
+# Residual variance
+resid_variance <- as.numeric(block_var["Residual", "Variance"])
+resid_sd <- sqrt(resid_variance)
+
+block_variance
+block_sd
+resid_variance
+resid_sd
+
+
+# Extract residuals and fitted values
+residuals_lme <- resid(model_block, type = "pearson")
+fitted_lme <- fitted(model_block)
+
+# Plot residuals vs fitted
+plot(fitted_lme, residuals_lme,
+     xlab = "Fitted values", ylab = "Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+#looking for random scatter - 
+
+qqnorm(residuals_lme)
+qqline(residuals_lme, col = "red")
+
+#normality looking for ~ straight line
+
+acf(residuals_lme, main = "ACF of residuals")
+#independence of residuals
+
+# Extract block-level random effects
+block_effects <- ranef(model_block)$Block
+
+boxplot(residuals_lme ~ data_clean$Treatment,
+        main = "Residuals by Treatment")
+boxplot(residuals_lme ~ data_clean$Tree_species,
+        main = "Residuals by Tree Species")
+#normally distributed block effects
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+#model assumptions
+
+# Extract residuals and fitted values
+residuals_lme <- resid(model_block, type = "pearson")
+fitted_lme <- fitted(model_block)
+
+# Plot residuals vs fitted
+plot(fitted_lme, residuals_lme,
+     xlab = "Fitted values", ylab = "Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lty = 2)
+
+#looking for random scatter - 
+
+qqnorm(residuals_lme)
+qqline(residuals_lme, col = "red")
+
+#normality looking for ~ straight line
+
+acf(residuals_lme, main = "ACF of residuals")
+#independence of residuals
+
+# Extract block-level random effects
+block_effects <- ranef(model_block)$Block
+
+boxplot(residuals_lme ~ data_clean$Treatment,
+        main = "Residuals by Treatment")
+boxplot(residuals_lme ~ data_clean$Tree_species,
+        main = "Residuals by Tree Species")
+#normally distributed block effects
+```

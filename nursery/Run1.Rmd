@@ -1,0 +1,678 @@
+---
+title: "Elsoms Run 1"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    keep_tex: true
+    
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  library(ggpubr)
+  library(ggplot2)
+  
+  knitr::opts_chunk$set(echo = FALSE)
+})
+```
+This is data analysis notes - more details also see Nursery Trials/Experiments/Run 1/Elsoms Run 1 Results
+
+We grew sitka, birch and pine with different emf at different fertilizer levels to see whether higher fertilizer would influence emf colorization of roots. We  obtained media without added fertilizer, asked the supplier the quantities of added fertilizer per litre and then added this back in at 25, 50, 75 and 100% of their usual amounts. 
+
+We had a limited selection of emf at the time (due to other commitments in production) and therefore only used heb and pax with birch, sui with pine and sui heb and pax with sitka. Note that there was some query with the heb sequence and on reBLAST it came back as pax - so this experiment may be limited sitka/pax, sitka/sui, birch/pax, pine/sui. Further - note that this is not a trial of responses due to different strains in the library as we would need to trial all strains of interest at the same time. 
+
+We also wanted to look at any pellet effect and therefore included the use of an uninoculated blank pellet as well as a no pellet control.
+
+There were 40 trees in each treatment. 
+
+Trees were miniplugs planted in early January. 
+
+This trial looked at:
+
+
+1) Whether higher fertilizer levels would affect emf colonization rates on the roots (as quantified by change in height)
+
+
+2) Any effect of pellet as a fertilizer
+
+
+3) Any difference in growth of birch/pine/sitka with emf compared to control
+
+
+4) Any difference in growth for birch and sitka between emf (no rigorous)
+
+Data collected in this run - initial height, final height, mortality
+
+
+Treatments: Control - no pellet (co), Control with blank pellet (co), heb, pax, sui
+
+Trees, *Betula pendula* (BP), *Pinus sylvestris* (PS), *Picea sitchensis* (SITKA)
+
+Data munging:
+
+Initial height data was collected as frequencies, e.g. number of sitka of 2-3cm, number of 3-4cm, partly due to time constraints measuring individual trees (PG set up this run alone) but in retrospect, since they are so small, this might not be a bad way of recording them. This initial data must first be reshaped into columns of heights.
+
+initial := long_df_i
+
+
+Final heights also need some re-shaping to a long df, but data was recorded as height per tree
+
+final := long_df_f
+
+
+Final part of reshaping combines initial and final data, adds the time point
+
+long_df_i & long_df_f:= combined_df
+
+Finally, change in height is calculated as the average of each treatment at each fert level
+
+merged_df = average change in heights grouped by tree/emf/fert
+
+```{r, echo=FALSE, warning=FALSE}
+
+#RUN THIS CHUNK TO LOAD AND RESHAPE ALL DATA. INITIAL, FINAL, ARE THEN COMBINED TO CREATE
+#WORKING DF - combined_df
+#load the data - original data is stored in Nursery Trials/Experiments/Run 1/d
+#data run 1/Nursery June 2025 RAW data
+initial <- suppressMessages(read_xlsx('../../../data/nursery/NurseryRun1.xlsx', sheet = 'Rdata_i', col_names = FALSE))
+final   <- suppressMessages(read_xlsx('../../../data/nursery/NurseryRun1.xlsx', sheet = 'Rdata_f', col_names = FALSE))
+
+#decompress the data frame to get the heights out of the groups
+#take the body of the data frame - not the first three rows for treatment labels
+body = initial[-c(1:3),]
+
+
+# Make row 1 the column names
+colnames(body) <- as.character(body[1, ])
+
+# Remove the first row since it's now the header
+body <- body[-1, ]
+
+body <- data.frame(lapply(body, function(x) as.numeric(as.character(x))))
+
+# Optionally reset row names
+rownames(body) <- NULL
+
+
+# heights column
+heights <- body$NAME
+
+# treatment columns
+treatments <- body[, -1]
+
+# replace NA with 0
+treatments[is.na(treatments)] <- 0
+
+# round counts to integers (rep requires integers)
+treatments <- round(treatments)
+
+# expand each treatment
+expanded_list <- lapply(treatments, function(col) {
+  # keep only positive counts
+  pos_idx <- which(col > 0)
+  rep(heights[pos_idx], times = col[pos_idx])
+})
+
+# Because each treatment may have different number of trees, pad with NA
+max_len <- max(sapply(expanded_list, length))
+expanded_list_padded <- lapply(expanded_list, function(x) c(x, rep(NA, max_len - length(x))))
+
+# combine into dataframe
+expanded_df <- as.data.frame(expanded_list_padded)
+colnames(expanded_df) <- colnames(treatments)
+
+#add the initial rows back on which list the tree species and treatment long
+row12 = as.data.frame(initial[c(1,2,3),-1])
+colnames(row12) =  colnames(expanded_df)
+initial_wide = rbind(row12, expanded_df)
+
+#make long
+# Extract header info
+species         <- as.character(initial_wide[1, ])
+fertiliser_lvl  <- as.character(initial_wide[2, ])
+treatment       <- as.character(initial_wide[3, ])
+
+# Extract the actual data (tree heights)
+data_rows <- initial_wide[-(1:3), ]
+
+colnames(data_rows) <- paste0("V", seq_len(ncol(data_rows)))
+
+
+# Add header info as columns for later use
+metadata <- data.frame(
+  Species = species,
+  Fertiliser = fertiliser_lvl,
+  Treatment = treatment
+)
+
+long_df_i <- data_rows %>%
+  mutate(TreeID = row_number()) %>%    # optional: row number as ID
+  pivot_longer(
+    cols = -TreeID,
+    names_to = "Column",
+    values_to = "Height"
+  ) %>%
+  # Add metadata by matching Column
+  mutate(
+    Species = species[as.numeric(gsub("V", "", Column))],
+    Fertiliser = fertiliser_lvl[as.numeric(gsub("V", "", Column))],
+    Treatment = treatment[as.numeric(gsub("V", "", Column))]
+  ) %>%
+  select(TreeID, Species, Fertiliser, Treatment, Height)
+
+#now reshape final data########################################################
+#now make the final height data long, that was measured per tree, so dont need to decompress
+colnames(final) = as.character(final[4,])
+final = final[-4,]
+
+# Extract header info
+species         <- as.character(final[1, ])
+fertiliser_lvl  <- as.character(final[2, ])
+treatment       <- as.character(final[3, ])
+
+# Extract the actual data (tree heights)
+data_rows <- final[-(1:3), ]
+
+colnames(data_rows) <- paste0("V", seq_len(ncol(data_rows)))
+
+
+# Add header info as columns for later use
+metadata <- data.frame(
+  Species = species,
+  Fertiliser = fertiliser_lvl,
+  Treatment = treatment
+)
+
+long_df_f <- data_rows %>%
+  mutate(TreeID = row_number()) %>%    # optional: row number as ID
+  pivot_longer(
+    cols = -TreeID,
+    names_to = "Column",
+    values_to = "Height"
+  ) %>%
+  # Add metadata by matching Column
+  mutate(
+    Species = species[as.numeric(gsub("V", "", Column))],
+    Fertiliser = fertiliser_lvl[as.numeric(gsub("V", "", Column))],
+    Treatment = treatment[as.numeric(gsub("V", "", Column))]
+  ) %>%
+  select(TreeID, Species, Fertiliser, Treatment, Height)
+
+#Finally combine initial and final into single long df#########################
+# Add a column for time point
+long_df_i2 <- long_df_i %>% mutate(Time = "Initial")
+long_df_f2 <- long_df_f %>% mutate(Time = "Final")
+
+# Combine
+combined_df <- bind_rows(long_df_i2, long_df_f2)
+
+# Convert Height to numeric
+combined_df <- combined_df %>%
+  mutate(
+    Height = as.numeric(as.character(Height)),
+    Fertiliser = factor(Fertiliser, levels = c("0","25","50","75","100")) # ensure correct order
+  )
+
+#The introduced NAs are the dead trees - no height entered
+
+
+#Also create a change in height df as average by each fertilizer level - will use this later for t test of the groups
+
+avg_i <- long_df_i %>%
+  group_by(Species, Fertiliser, Treatment) %>%
+  summarise(InitialHeight = mean(as.numeric(Height), na.rm = TRUE), .groups = "drop")
+
+avg_f <- long_df_f %>%
+  group_by(Species, Fertiliser, Treatment) %>%
+  summarise(FinalHeight = mean(as.numeric(Height), na.rm = TRUE), .groups = "drop")
+
+# Convert heights to numeric and remove non-numeric entries
+long_df_i <- long_df_i %>%
+  mutate(Height = as.numeric(as.character(Height))) %>%
+  filter(!is.na(Height))
+
+long_df_f <- long_df_f %>%
+  mutate(Height = as.numeric(as.character(Height))) %>%
+  filter(!is.na(Height))  # removes dead trees
+
+# Compute averages and merge, this takes average per treatment, so left with one value for each treatment
+merged_df <- long_df_i %>%
+  group_by(Species, Fertiliser, Treatment) %>%
+  summarise(InitialHeight = mean(Height, na.rm = TRUE), .groups = "drop") %>%
+  full_join(
+    long_df_f %>%
+      group_by(Species, Fertiliser, Treatment) %>%
+      summarise(FinalHeight = mean(Height, na.rm = TRUE), .groups = "drop"),
+    by = c("Species", "Fertiliser", "Treatment")
+  ) %>%
+  mutate(HeightChange = FinalHeight - InitialHeight)
+
+merged_df <- merged_df %>%
+  mutate(Fertiliser = factor(Fertiliser, levels = c("0", "25", "50", "75", "100")))
+
+#merge to get change in heights - but not average so you can look at box plot
+
+# Merge initial and final heights by seedling
+changeinhts_df <- long_df_i %>%
+  select(TreeID, Species, Fertiliser, Treatment, InitialHeight = Height) %>%
+  inner_join(
+    long_df_f %>%
+      select(TreeID, Species, Fertiliser, Treatment, FinalHeight = Height),
+    by = c("TreeID", "Species", "Fertiliser", "Treatment")
+  ) %>%
+  mutate(HeightChange = FinalHeight - InitialHeight)
+
+```
+
+
+Inital exploration - box plots of change in heights
+
+
+```{r, echo=FALSE, warning=FALSE}
+#make fert a factor for a box plot
+#select out pine/sitka/birch separately because cant see together vert well
+data <- changeinhts_df%>%
+  mutate(Fertiliser = factor(Fertiliser, levels = c("0", "25", "50", "75", "100")))
+
+birch = data %>% filter(Species == "BP")
+pine = data %>% filter(Species == "PS")
+sitka = data %>% filter(Species == "SITKA")
+
+treatment_cols <- c(
+  "co"  = "orange",
+  "cb"  = "orange",
+  "heb" = "forestgreen",
+  "pax" = "forestgreen",
+  "sui" = "forestgreen"
+)
+
+ggplot(birch, aes(x = Fertiliser, y = HeightChange, fill = Treatment)) +
+  geom_violin(trim = FALSE) +          # trim=FALSE keeps tails visible
+  scale_fill_manual(values = treatment_cols) +
+  theme_bw() +
+  labs(
+    title = "Height Change by Fertiliser and Treatment, Birch",
+    x = "Fertiliser Level",
+    y = "Height Change"
+  )
+
+ggplot(pine, aes(x = Fertiliser, y = HeightChange, fill = Treatment)) +
+  geom_violin(trim = FALSE) +          # trim=FALSE keeps tails visible
+  scale_fill_manual(values = treatment_cols) +
+  theme_bw() +
+  labs(
+    title = "Height Change by Fertiliser and Treatment, Pine",
+    x = "Fertiliser Level",
+    y = "Height Change"
+  )
+
+ggplot(sitka, aes(x = Fertiliser, y = HeightChange, fill = Treatment)) +
+  geom_violin(trim = FALSE) +          # trim=FALSE keeps tails visible
+  scale_fill_manual(values = treatment_cols) +
+  theme_bw() +
+  labs(
+    title = "Height Change by Fertiliser and Treatment, Sitka",
+    x = "Fertiliser Level",
+    y = "Height Change"
+  )
+```
+Initial exploration suggests  birch and sitka had greater change in height than controls, but this is less clear for pine. The blank pellet does not appear to have had any affect.
+
+1) Does fertilizer affect growth?
+
+To see whether there is a relationship between change in height and fertilizer levels, use linear model
+
+```{r, echo=FALSE, warning=FALSE}
+#make fertilizer a factor for this plot
+merged_df <- merged_df %>%
+  mutate(
+    Fertiliser = as.numeric(as.character(Fertiliser)),
+    HeightChange = as.numeric(HeightChange)
+  )
+library(purrr)
+
+lm_stats <- merged_df %>%
+  group_by(Species, Treatment) %>%
+  summarise(
+    lm_fit = list(lm(HeightChange ~ Fertiliser, data = cur_data())),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    r2 = map_dbl(lm_fit, ~ summary(.x)$r.squared),
+    pval = map_dbl(lm_fit, ~ summary(.x)$coefficients[2,4]),
+    eq_label = paste0("R^2 == ", round(r2,2), "~p == ", signif(pval,2)) # plotmath
+  ) %>%
+  select(-lm_fit, -r2, -pval)
+
+
+merged_df <- merged_df %>%
+  mutate(Fertiliser_num = as.numeric(as.character(Fertiliser)))
+
+# Step 2: Compute label positions per Species × Treatment
+label_positions <- merged_df %>%
+  group_by(Species, Treatment) %>%
+  summarise(
+    label_y = max(HeightChange, na.rm = TRUE) * 1.05,   # slightly above max
+    label_x = min(Fertiliser_num, na.rm = TRUE) + 0.5,  # slightly inside left edge
+    .groups = "drop"
+  ) %>%
+  left_join(lm_stats, by = c("Species", "Treatment"))
+
+# Step 3: Plot
+ggplot(merged_df, aes(x = Fertiliser_num, y = HeightChange)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, formula = y ~ x, color = "blue") +
+  geom_text(
+    data = label_positions,
+    aes(x = label_x, y = label_y, label = eq_label),
+    inherit.aes = FALSE,
+    hjust = 0,
+    size = 3,
+    parse = TRUE
+  ) +
+  facet_grid(Species ~ Treatment, scales = "free_y") +
+  theme_bw() +
+  labs(
+    title = "Height Change vs Fertiliser",
+    x = "Fertiliser Level",
+    y = "Height Change"
+  )
+ 
+```
+The linear model suggests no correlation between fertilizer and change in height. Although for cb/BP treatment the slope and R\textsuperscript{2} = 0.59 looks like a correlation, p = 0.128 suggest it is weak. Similarly for pax/BP there is a weak correlation (p = 0.08). Any correlation is not consistent between treatments. 
+
+The lack of correlation may be due to improper mixing of fertilizer back in to the media. The added chemicals were granular and hence it was impossible to ensure full homogenization. Therefore, this data may be inconclusive.
+
+The final part of this analysis would be to observe roots, but so far we have not had time/people to do that. Therefore it could be that case that physical colonization is different, but it has not translated in a change in height.
+
+Since the impact of fertilizer on growth appears non-significant - all the data will be combined to create a larger data set such that each treatment had 5 repeats.
+
+
+```{r, echo=FALSE, warning=FALSE}
+data <- changeinhts_df%>%
+  mutate(Fertiliser = factor(Fertiliser, levels = c("0", "25", "50", "75", "100")))
+
+treatment_cols <- c(
+  "co" = "orange",
+  "cb" = "orange",
+  "heb" = "forestgreen",
+  "pax" = "forestgreen"
+)
+###Box plots by species species with t tests ###############################################
+
+
+###t test#######################################################################
+#This little chunk just runs t test on the average heights - that is the 40 trees in each tray. avg hts
+#were calculated in the initial data chunk
+
+#using the merged_df - which uses avg_i and avg_final merged into long df of avg change in hts by treatment
+
+
+#bit of code to run t test - just checking emf versus co
+run_change_tests <- function(df, species_name) {
+
+  df_species <- df %>% filter(Species == species_name)
+
+  # Only test treatments that actually exist for this species
+  test_treatments <- intersect(c("heb", "pax", "sui"), unique(df_species$Treatment))
+
+  results <- lapply(test_treatments, function(treat) {
+    t.test(
+      df_species$HeightChange[df_species$Treatment == treat],
+      df_species$HeightChange[df_species$Treatment == "co"],
+      alternative = "two.sided"
+    )
+  })
+
+  names(results) <- test_treatments
+  return(results)
+}
+
+tests_BP    <- run_change_tests(merged_df, "BP")
+tests_PS    <- run_change_tests(merged_df, "PS")
+tests_SITKA <- run_change_tests(merged_df, "SITKA")
+
+
+##end t test####################################################################
+
+# Filter birch and average per Fertilizer × Treatment
+birch_avg <- data %>%
+  filter(Species == 'BP') %>%
+  group_by(Treatment, Fertiliser) %>%
+  summarise(HeightChange = mean(HeightChange, na.rm = TRUE), .groups = "drop")
+
+#format the pvals from above for birch
+
+p_heb <- tests_BP$heb$p.value
+p_pax <- tests_BP$pax$p.value
+
+p_heb_lab <- paste0("heb p = ", signif(p_heb, 3))
+p_pax_lab <- paste0("pax p = ", signif(p_pax, 3))
+
+# format for plotting
+p_labels_bp <- data.frame(
+  Treatment = c("heb", "pax"),
+  HeightChange = c(max(birch_avg$HeightChange)*1.05, max(birch_avg$HeightChange)*1.10),  # adjust y positions
+  label = c(paste0("p = ", signif(p_heb,3)),
+            paste0("p = ", signif(p_pax,3)))
+)
+
+treatment_cols <- c(
+  "co" = "orange",
+  "cb" = "orange",
+  "heb" = "forestgreen",
+  "pax" = "forestgreen"
+ )
+
+# Plot
+ggplot(birch_avg, aes(x = Treatment, y = HeightChange)) +
+  geom_boxplot(aes(fill = Treatment), color = "black", outlier.shape = NA) +
+  geom_point(aes(color = Fertiliser), size = 3, position = position_dodge(width = 0.75)) +
+  geom_text(
+    data = p_labels_bp,
+    aes(x = Treatment, y = HeightChange, label = label),
+    inherit.aes = FALSE,
+    vjust = 0  # position just above the boxplot
+  ) +
+  scale_fill_manual(values = treatment_cols) +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() +
+  labs(
+    x = "Treatment",
+    y = "Height Change",
+    color = "Fertiliser",
+    title = "Birch Height Change by Treatment "
+  )
+
+#replot that for customer without the fertiliser dots because they might confuse
+# Plot without Fertiliser points, simplified legend
+# Create a legend grouping variable
+birch_avg <- birch_avg %>%
+  mutate(LegendGroup = ifelse(Treatment %in% c("co", "cb"), "Control", "Treatment"))
+
+# Plot
+ggplot(birch_avg, aes(x = Treatment, y = HeightChange, fill = LegendGroup)) +
+  geom_boxplot(color = "black", outlier.shape = NA) +
+  geom_text(
+    data = p_labels_bp,
+    aes(x = Treatment, y = HeightChange, label = label),
+    inherit.aes = FALSE,
+    vjust = 0
+  ) +
+  scale_fill_manual(
+    values = c("Control" = "orange", "Treatment" = "forestgreen")
+  ) +
+  theme_bw() +
+  labs(
+    x = "Treatment",
+    y = "Height Change",
+    fill = "",      # removes legend title
+    title = "Birch Height Change by Treatment"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+###pine#########################################################################
+
+#filter the pine data
+pine_avg <- data %>%
+  filter(Species == 'PS') %>%
+  group_by(Treatment, Fertiliser) %>%
+  summarise(HeightChange = mean(HeightChange, na.rm = TRUE), .groups = "drop")
+
+#format the pvals from above
+
+p_sui <- tests_PS$sui$p.value
+
+
+p_sui_lab <- paste0("sui p = ", signif(p_sui, 3))
+
+
+# format for plotting
+p_labels_ps <- data.frame(
+  Treatment = "sui",
+  HeightChange = max(pine_avg$HeightChange) * 1.05,  # just one y position
+  label = paste0("p = ", signif(p_sui, 3))
+)         
+
+
+treatment_cols <- c(
+  "co" = "orange",
+  "cb" = "orange",
+  "sui" = "forestgreen"
+ )
+
+
+# Plot
+ggplot(pine_avg, aes(x = Treatment, y = HeightChange)) +
+  geom_boxplot(aes(fill = Treatment), color = "black", outlier.shape = NA) +
+  geom_point(aes(color = Fertiliser), size = 3, position = position_dodge(width = 0.75)) +
+  geom_text(
+    data = p_labels_ps,
+    aes(x = Treatment, y = HeightChange, label = label),
+    inherit.aes = FALSE,
+    vjust = 0
+  ) +
+  scale_fill_manual(values = treatment_cols) +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() +
+  labs(
+    x = "Treatment",
+    y = "Height Change",
+    color = "Fertiliser",
+    title = "Pine Height Change by Treatment"
+  )
+###sitka########################################################################
+
+
+sitka_avg <- data %>%
+  filter(Species == 'SITKA') %>%
+  group_by(Treatment, Fertiliser) %>%
+  summarise(HeightChange = mean(HeightChange, na.rm = TRUE), .groups = "drop")
+
+#format the pvals from above
+p_heb_sit <- tests_SITKA$heb$p.value
+p_pax_sit = tests_SITKA$pax$p.value
+p_sui_sit = tests_SITKA$sui$p.value
+
+p_heb_sit_lab <- paste0("heb p = ", signif(p_heb_sit, 3))
+p_pax_sit_lab <- paste0("pax p = ", signif(p_pax_sit, 3))
+p_sui_sit_lab <- paste0("sui p = ", signif(p_sui_sit, 3))
+
+# format for plotting
+p_labels_sit <- data.frame(
+  Treatment = c("heb", "pax", "sui"),
+  HeightChange = c(
+    max(sitka_avg$HeightChange)*1.05,
+    max(sitka_avg$HeightChange)*1.10,
+    max(sitka_avg$HeightChange)*1.15
+  ),  # adjust y positions above boxplots
+  label = c(
+    paste0("p = ", signif(p_heb_sit, 3)),
+    paste0("p = ", signif(p_pax_sit, 3)),
+    paste0("p = ", signif(p_sui_sit, 3))
+  )
+)
+
+
+
+treatment_cols <- c(
+  "co" = "orange",
+  "cb" = "orange",
+  "heb" = "forestgreen",
+  "pax" = "forestgreen",
+  "sui" = "forestgreen"
+)
+
+
+# Plot
+ggplot(sitka_avg, aes(x = Treatment, y = HeightChange)) +
+  geom_boxplot(aes(fill = Treatment), color = "black", outlier.shape = NA) +
+  geom_point(aes(color = Fertiliser), size = 3, position = position_dodge(width = 0.75)) +
+  geom_text(
+    data = p_labels_sit,
+    aes(x = Treatment, y = HeightChange, label = label),
+    inherit.aes = FALSE,
+    vjust = 0
+  ) +
+  scale_fill_manual(values = treatment_cols) +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() +
+  labs(
+    x = "Treatment",
+    y = "Height Change",
+    color = "Fertiliser",
+    title = "Sitka Height Change by Treatment"
+  )
+
+#another simpler one for customer
+
+# Create a legend grouping variable
+sitka_avg <- sitka_avg %>%
+  mutate(LegendGroup = ifelse(Treatment %in% c("co", "cb"), "Control", "Treatment"))
+
+# Plot
+ggplot(sitka_avg, aes(x = Treatment, y = HeightChange, fill = LegendGroup)) +
+  geom_boxplot(color = "black", outlier.shape = NA) +
+  geom_text(
+    data = p_labels_sit,
+    aes(x = Treatment, y = HeightChange, label = label),
+    inherit.aes = FALSE,
+    vjust = 0
+  ) +
+  scale_fill_manual(
+    values = c("Control" = "orange", "Treatment" = "forestgreen")
+  ) +
+  theme_bw() +
+  labs(
+    x = "Treatment",
+    y = "Height Change",
+    fill = "",      # remove legend title
+    title = "Sitka Height Change by Treatment"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+The plots combine the fertilizer treatments into a repeat, so that there are 5 reps of each emf/tree treatment. The coloured points on the charts show the average change in height for that fertilizer level. That is, the average of 40 trees per fertilizer level, The box plots visualize all data for each treatment combined, that is 200 trees in total per combined treatment. The p values are t test compared to co of the average values of change in height per treatment. That is - the average change in height of the 40 birch trees treated with pax, compared to the average of the 40 birch trees in the control group.
+
+Birch shows change in height for pellet compared to controls. There is a significant change in height of ~3.75cm over the growing period 
+
+Pine shows no significant difference in change in height. This could be for several reasons. i) The pine at Elsoms is already colonized by something, we need to examine the roots to see what it is - might be highly colonized by a sui to start with. ii) With the trays on the matting, roots had grown out of the trays and into the mats and were highly intermixed. Difficult to say that these were separate treatments
+
+Sitka shows significant (p = 0.0498 compared to co) but very small change in height of around 1.5cm for sui, but not for pax or heb. This may be because sui is better at promoting growth in these conditions. Height change may be small because plants were harvested before the typical late season flush
+Blank pellet had no affect in any treatment
+
+Note that for all birch and sitka, the heb/pax response was the same, further indicating that this heb could be a pax.
+
+Also note - no difference between co and cb.
+
+
+
+
+
+
+
+

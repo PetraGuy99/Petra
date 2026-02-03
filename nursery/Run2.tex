@@ -1,0 +1,206 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Elsoms Run 2},
+  pdfauthor={Petra Guy},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Elsoms Run 2}
+\author{Petra Guy}
+\date{2025-11-26}
+
+\begin{document}
+\maketitle
+
+This analysis summarizes Elsoms run 2. Nursery Trials/Experiments/Run
+1/Elsoms Run 2 Results
+
+The first few charts look at oak mortality. The oaks were very mildewed
+and I had almost decided to omit them from the experiment. However, I
+did a mortality check first. Some trees had died immediately on
+planting, and this number is deducted from the total number of trees per
+tray. The mortality is then the number of trees which died
+subsequently/this reduced starting number
+
+\includegraphics{Run2_files/figure-latex/unnamed-chunk-2-1.pdf}
+
+Fig caption: Control, trees which received no inoculum. Treatment, these
+trees received liquid innoculum of 6 different emf, heb = \emph{Hebeloma
+spp}, lac = \emph{Laccaria bicolor}, lact = \emph{Lactarius torminosus},
+pax = \emph{Paxillus involutus}, scl = \emph{Scleroderma areolatum}, sui
+= \emph{Suillus bovinus}
+
+If the droughting is to be believed, and this is an issue, because it
+was an oversight by Elsoms rather than a controlled experiment, then the
+emf only had an impact on mortality in the droughting treatment. This
+data may be useful to inform future runs - but perhaps used with caution
+with customers. Next graph combines all the oaks ignoring the droughting
+treatment.
+
+\includegraphics{Run2_files/figure-latex/unnamed-chunk-3-1.pdf} Fig
+caption: Control, trees which received no innoculum. Treatment, these
+trees received liquid innoculum of 6 different emf, heb = \emph{Hebeloma
+spp}, lac = \emph{Laccaria bicolor}, lact = \emph{Lactarius torminosus},
+pax = \emph{Paxillus involutus}, scl = \emph{Scleroderma areolatum}, sui
+= \emph{Suillus bovinus}
+
+Above we ignore whether the trays were on the droughted or non-droughted
+bench. Since some of the trees died immediately on the same day as
+planting, these were removed from the analysis as this was not related
+to treatment. each group then has slightly different starting number of
+trees and mortality is calculated as number of trees which subsequently
+died/(80-number which died immediately)
+
+Fig caption: Control, trees which received no innoculum. Treatment,
+these trees received liquid innoculum of 6 different emf, heb =
+\emph{Hebeloma spp}, lac = \emph{Laccaria bicolor}, lact =
+\emph{Lactarius torminosus}, pax = \emph{Paxillus involutus}, scl =
+\emph{Scleroderma areolatum}, sui = \emph{Suillus bovinus}. The stars
+represent the significance of a Welch's t test with ** p \textless=
+0.01, *** p \textless= 0.001. Applied emf gives a significant change in
+height for Lactarius, Paxillus and Scleroderma. Note that we do not
+expect a difference for Suillus, this treatment included partially as
+cross check and partially to keep teratments equal across all tree
+species tested. Seeing an effect for Suillus may have alerted us to some
+other unmeasured effect
+
+Here is above splitting into drought and non-drought
+
+\includegraphics{Run2_files/figure-latex/unnamed-chunk-4-1.pdf} Fig
+caption: Control, trees which received no innoculum. Treatment, these
+trees received liquid innoculum of 6 different emf, heb = \emph{Hebeloma
+spp}, lac = \emph{Laccaria bicolor}, lact = \emph{Lactarius torminosus},
+pax = \emph{Paxillus involutus}, scl = \emph{Scleroderma areolatum}, sui
+= \emph{Suillus bovinus}. The stars represent the significance of a
+Welch's t test with ** p \textless= 0.01, *** p \textless= 0.001.
+
+When we also split out the drought and non drought we have the same
+pattern of lactarius, paxillus and scleroderma giving significant
+changes in height, so whilst the droughting may influence mortality, it
+does not appear to influence change in height.
+
+Cleaner here to run a lm with droughting as an effect as multipl
+pairwise t tests can inflate type 1 errors
+
+\includegraphics{Run2_files/figure-latex/unnamed-chunk-5-1.pdf} Linear
+model, main effects are fungi and drought, interaction effect of drought
+(i,e, how each fungi responds differently under drought vs non drought).
+Estimated marginal means (lm\_model \textasciitilde{} Fungi \textbar{}
+Drought ) - this is delta H of lact for each drought level, estimated by
+the model - not just the raw average. Contrast(emm) compares model
+adjusted mean of lact under drought to model adjusted mean of control
+under drought - similarly for non-drought.
+
+\includegraphics{Run2_files/figure-latex/unnamed-chunk-6-1.pdf}
+
+\includegraphics{Run2_files/figure-latex/unnamed-chunk-7-1.pdf}
+
+\begin{longtable}[]{@{}lrrrr@{}}
+\caption{Summary of Delta H by Fungal Treatment}\tabularnewline
+\toprule\noalign{}
+Fungi & n & Mean Delta H (cm) & SD (cm) & Variance \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+Fungi & n & Mean Delta H (cm) & SD (cm) & Variance \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+control & 38 & 2.96 & 2.90 & 8.41 \\
+heb & 69 & 4.24 & 3.81 & 14.50 \\
+lac & 60 & 3.44 & 2.78 & 7.75 \\
+lact & 71 & 5.64 & 4.51 & 20.36 \\
+pax & 66 & 4.80 & 3.64 & 13.27 \\
+scl & 67 & 4.93 & 3.59 & 12.88 \\
+sui & 60 & 3.00 & 2.57 & 6.61 \\
+\end{longtable}
+
+\includegraphics{Run2_files/figure-latex/unnamed-chunk-8-1.pdf}
+
+\end{document}

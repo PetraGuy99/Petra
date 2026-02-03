@@ -1,0 +1,399 @@
+---
+title: "ForrestEstate2025"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  library(ggpubr)
+  library(ggplot2)
+  
+  knitr::opts_chunk$set(echo = FALSE)
+})
+```
+
+This analysis is for the Forrest Estate, monitored autumn 2024 and autumn 2025. We did not have a t0 time point, the first set of data taken after 1 growing seasin, the second 12 months later. We did not set up this site according to our standard system. We monitored Picea sitchensis, Pinus sylvestris and Pices abies. The Picea abies and Pinus sylvestris both suffered weevil damage with near 100% mortality at the second measurement.
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+#note that only sitka - SSC and SST has a H_0 abnd H_1 time point
+
+
+p_abies_T = read_excel('../../../data/field/Forrest2025.xlsx',sheet = 'NST')
+p_abies_C =read_excel('../../../data/field/Forrest2025.xlsx',sheet = 'NSC')
+p_sitch_T = read_excel('../../../data/field/Forrest2025.xlsx', sheet = 'SST')
+p_sitch_C = read_excel('../../../data/field/Forrest2025.xlsx',sheet = 'SSC')
+p_sylv_T1 = read_excel('../../../data/field/Forrest2025.xlsx' ,sheet = 'SPT')
+p_sylv_T2 = read_excel('../../../data/field/Forrest2025.xlsx', sheet = 'SPT2')
+p_sylv_C = read_excel('../../../data/field/Forrest2025.xlsx',sheet = 'SPC')
+```
+
+```{r, echo = FALSE, warning=FALSE}
+
+# make a summary table of mean values at t0
+all_heights <- bind_rows(
+p_abies_C   %>% mutate(Species = "P. abies",  Treatment = "Control"),
+p_abies_T  %>% mutate(Species = "P. abies",  Treatment = "Treatment"),
+
+  p_sitch_C   %>% mutate(Species = "P. sitchensis", Treatment = "Control"),
+  p_sitch_T %>% mutate(Species = "P. sitchensis", Treatment = "Treatment"),
+
+  p_sylv_C    %>% mutate(Species = "P. sylvestris", Treatment = "Control"),
+  p_sylv_T1   %>% mutate(Species = "P. sylvestris", Treatment = "Treatment1"),
+  p_sylv_T2   %>% mutate(Species = "P. sylvestris", Treatment = "Treatment2")
+)
+
+
+
+summary_table <- all_heights %>%
+  group_by(Tree_Species, Treatment) %>%
+  summarise(
+    mean_height = mean(Height_0, na.rm = TRUE),
+    se_height   = sd(Height_0, na.rm = TRUE) / sqrt(sum(!is.na(Height_0))),
+    mean_rcd    = mean(Rcd_0, na.rm = TRUE),
+    se_rcd      = sd(Rcd_0, na.rm = TRUE) / sqrt(sum(!is.na(Rcd_0))),
+    n = n(),
+    .groups = "drop"
+  )
+
+
+#plot of the mean values
+
+treat_cols_plot <- c(
+  "Control" = "orange",
+  "Treatment" = "forestgreen",
+  "Treatment1" = "forestgreen",
+  "Treatment2" = "forestgreen"
+)
+
+ggplot(summary_table,
+                   aes(x = Tree_Species, y = mean_height, fill = Treatment)) +
+  geom_col(position = position_dodge(width = 0.8), colour = "black") +
+  geom_errorbar(aes(ymin = mean_height - se_height,
+                    ymax = mean_height + se_height),
+                width = 0.2,
+                position = position_dodge(width = 0.8)) +
+  scale_fill_manual(
+    values = treat_cols_plot,
+    name = "",
+    breaks = c("Control", "Treatment"),  # only these appear in legend
+    labels = c("Control", "Pellet")
+  ) +
+  coord_cartesian(ylim = c(40, NA)) +
+  labs(x = "", y = "Initial Mean Height (cm)") +
+  theme_bw(base_size = 14)
+
+
+ggplot(summary_table,
+                aes(x = Tree_Species,
+                    y = mean_rcd,
+                    fill = Treatment)) +
+  geom_col(position = position_dodge(width = 0.8), colour = "black") +
+  geom_errorbar(aes(ymin = mean_rcd - se_rcd,
+                    ymax = mean_rcd + se_rcd),
+                width = .2,
+                position = position_dodge(width = 0.8)) +
+  scale_fill_manual(
+    values = treat_cols_plot,
+    name = "",
+    breaks = c("Control", "Treatment"),  # only these appear in legend
+    labels = c("Control", "Pellet")
+  ) +
+  coord_cartesian(ylim = c(6, NA)) +
+  labs(x = "", y = "Initial Mean RCD (mm)",
+       title = "") +
+  theme_bw(base_size = 14)
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+#combine into hts df
+
+all_heights <- bind_rows(
+p_abies_C   %>% mutate(Species = "P. abies",  Treatment = "Control"),
+p_abies_T  %>% mutate(Species = "P. abies",  Treatment = "Treatment"),
+
+  p_sitch_C   %>% mutate(Species = "P. sitchensis", Treatment = "Control"),
+  p_sitch_T %>% mutate(Species = "P. sitchensis", Treatment = "Treatment"),
+
+  p_sylv_C    %>% mutate(Species = "P. sylvestris", Treatment = "Control"),
+  p_sylv_T1   %>% mutate(Species = "P. sylvestris", Treatment = "Treatment1"),
+  p_sylv_T2   %>% mutate(Species = "P. sylvestris", Treatment = "Treatment2")
+)
+
+
+
+#box plot of starting heights for all trees and treatments
+scale_fill_manual(
+  values = c(
+    "Control"   = "orange",
+    "Treatment" = "forestgreen",
+    "Treatment1"        = "forestgreen",
+    "Treatment2"        = "forestgreen"
+  )
+)
+ggplot(all_heights, aes(x = Species, y = Height_0, fill = Treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA) +
+  theme_bw() +
+  labs(x = "", y = "Initial Heights (cm)") +
+   scale_fill_manual(
+    values = treat_cols_plot,
+    name = "",
+    breaks = c("Control", "Treatment"),  # only these appear in legend
+    labels = c("Control", "Pellet")
+  ) +
+   coord_cartesian(ylim = c(20, NA))
+  
+
+ggplot(all_heights, aes(x = Species, y = Rcd_0, fill = Treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA) +
+  theme_bw() +
+  labs(x = "", y = "Initial Root collar diamters (mm)") +
+ scale_fill_manual(
+    values = treat_cols_plot,
+    name = "",
+    breaks = c("Control", "Treatment"),  # only these appear in legend
+    labels = c("Control", "Pellet")
+  ) +
+   coord_cartesian(ylim = c(NA, 15))
+  
+
+```
+
+ALl treatment trees were larger than control trees at the end of the first growing season. This could be due to all control trees were shorted when planted, and we dont have t0 to confirm that - although that seems unlikley across all species and treatment areas
+
+
+```{r, echo=FALSE, warning=FALSE}
+#SCOTS PINE SURVIVAL
+#we recorded area within which scots were measured. This is rough survival at end of year 1 by taking count of number of trees in the treatment and control areas
+survival = read_excel('../../../data/field/Forrest2025.xlsx',sheet = 'survival')
+
+ggplot(survival, aes(x = treatment, y = density, fill = treatment)) +
+  geom_col(width = 0.3) +
+  theme_bw() +
+  theme(legend.position = 'none') +
+  labs(x = "", y = "Tree Density, trees per ha") +
+  scale_fill_manual(values = c("SPC" = "orange", "SPT" = "forestgreen")) +
+  scale_x_discrete(labels = c(
+    "SPC" = "Control",
+    "SPT" = "Treatment"
+  )) +
+  coord_cartesian(ylim = c(300, NA))
+
+```
+
+We measured the area over which the trees were monitored and recorded every living tree within that area. Hence we can estimate tree density. We only did this for pine. 
+
+```{r, echo=FALSE, warning=FALSE}
+#SITKA
+# Extract useful cols
+sitka_T = p_sitch_T %>% select(c(Tree_ID,Height_0,Height_1,Rcd_0,Rcd_mm_1,Comment_1, Weevil))
+sitka_C = p_sitch_C %>% select(c(Tree_ID,Height_0,Height_1,Rcd_0,Rcd_mm_1,Comment_1, Weevil))
+
+
+#count of dead/new leader etc
+#count the living trees = 100 (dead + Missing)
+# Define categories to count
+categories <- c("dead", "Missing", "Dt", "Nl")
+
+# Function to compute % for each category
+percent_categories <- function(df, treatment_name) {
+  df %>%
+    mutate(Comment_1 = as.character(Comment_1)) %>%
+    mutate(Comment_1 = ifelse(is.na(Comment_1), "NA", Comment_1)) %>%
+    group_by(Comment_1) %>%
+    summarise(Count = n(), .groups = "drop") %>%
+    filter(Comment_1 %in% c(categories, "NA")) %>%
+    mutate(Percent = 100 * Count / sum(Count),
+           Treatment = treatment_name)
+}
+
+# Apply to both datasets
+pct_T <- percent_categories(p_sitch_T, "Treatment")
+pct_C <- percent_categories(p_sitch_C, "Control")
+
+# Combine
+survival_pct <- bind_rows(pct_T, pct_C)
+
+# Publication-friendly colours for your categories
+pub_colors <- c(
+  "dead"    = "#E69F00",  # orange
+  "Missing" = "#56B4E9",  # blue
+  "Dt"      = "#009E73",  # green
+  "Nl"      = "#F0E442",  # yellow
+  "NA"      = "#0072B2"   # dark blue
+)
+
+
+ggplot(survival_pct, aes(x = Treatment, y = Percent, fill = Comment_1)) +
+  geom_col(colour = "black") +
+  theme_bw(base_size = 14) +
+  labs(x = "", y = "Number of trees", fill = "Status") +
+  scale_fill_manual(
+    values = pub_colors,
+    labels = c(
+      "dead"    = "Dead",
+      "Missing" = "Missing",
+      "Dt"      = "Dead top",
+      "Nl"      = "New leader",
+      "NA"      = "Undamaged"
+    )
+  )
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+# Function to count weevil numbers
+#2 = ring barked, 1 = half way
+
+weevil_count <- function(df, treatment_name) {
+  df %>%
+    group_by(Weevil) %>%
+    summarise(Count = n(), .groups = "drop") %>%
+    filter(Weevil %in% c(0, 1, 2)) %>%
+    mutate(Treatment = treatment_name)
+}
+
+# Apply to both datasets
+weevil_T <- weevil_count(p_sitch_T, "SPT")
+weevil_C <- weevil_count(p_sitch_C, "SPC")
+
+# Combine
+weevil_df <- bind_rows(weevil_T, weevil_C)
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE}
+#look at change in height, but remove the dead tops, new leaders, missing and dead
+
+p_sitch_T_filtered <- p_sitch_T %>%
+  filter(!Comment_1 %in% c("Missing", "Dt", "Nl", "dead"))
+
+p_sitch_C_filtered <- p_sitch_C %>%
+  filter(!Comment_1 %in% c("Missing", "Dt", "Nl", "dead"))
+
+# add the delta height
+p_sitch_T_filtered <- p_sitch_T_filtered %>%
+  mutate(Growth = Height_1 - Height_0)
+
+p_sitch_C_filtered <- p_sitch_C_filtered %>%
+  mutate(Growth = Height_1 - Height_0)
+
+# Combine treatment and control
+growth_df <- bind_rows(
+  p_sitch_T_filtered %>% mutate(Treatment = "Treatment"),
+  p_sitch_C_filtered %>% mutate(Treatment = "Control")
+)
+
+# Summarise mean and SE
+growth_summary <- growth_df %>%
+  group_by(Treatment) %>%
+  summarise(
+    MeanGrowth = mean(Growth, na.rm = TRUE),
+    SE = sd(Growth, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  )
+
+ggplot(growth_summary, aes(x = Treatment, y = MeanGrowth, fill = Treatment)) +
+  geom_col(width = 0.4) +
+  geom_errorbar(aes(ymin = MeanGrowth - SE, ymax = MeanGrowth + SE),
+                width = 0.2) +
+  theme_bw(base_size = 14) +
+  theme(legend.position = "none")+
+  labs(x = "", y = "Average change in height (cm)") +
+  scale_fill_manual(values = c("Control" = "orange", "Treatment" = "forestgreen")) +
+  ylim(0, NA)   # start y-axis at 0
+```
+
+```{r, echo=FALSE, warning=FALSE}
+#look at change in rcd, only need to remove dead probably
+
+p_sitch_T_filtered <- p_sitch_T %>%
+  filter(!(Comment_1 %in% c( "Missing", "dead")))
+
+p_sitch_C_filtered <- p_sitch_C %>%
+  filter(!(Comment_1 %in% c("Missing", "dead")))
+
+# add the delta height
+p_sitch_T_filtered <- p_sitch_T_filtered %>%
+  mutate(ChangeRCD = Rcd_mm_1 - Rcd_0)
+
+p_sitch_C_filtered <- p_sitch_C_filtered %>%
+  mutate(ChangeRCD = Rcd_mm_1 - Rcd_0)
+
+# Combine treatment and control
+rcd_df <- bind_rows(
+  p_sitch_T_filtered %>% mutate(Treatment = "Treatment"),
+  p_sitch_C_filtered %>% mutate(Treatment = "Control")
+)
+
+# there are some weird -ve rcd - which are due to a new lead being put up
+#which is smaller than initial, so its not the same stem being measured
+#I will remove these by filtering any values less than 0
+
+rcd_df_above_zero = rcd_df %>% filter(ChangeRCD>=0)
+
+# Summarise mean and SE
+ChangeRCD_summary <- rcd_df_above_zero %>%
+  group_by(Treatment) %>%
+  summarise(
+    MeanGrowth = mean(ChangeRCD, na.rm = TRUE),
+    SE = sd(ChangeRCD, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  )
+
+ggplot(ChangeRCD_summary, aes(x = Treatment, y = MeanGrowth, fill = Treatment)) +
+  geom_col(width = 0.4) +
+  geom_errorbar(aes(ymin = MeanGrowth - SE, ymax = MeanGrowth + SE),
+                width = 0.2) +
+  theme_bw(base_size = 14) +
+  theme(legend.position = "none")+
+  labs(x = "", y = "Average change in rcd (mm)") +
+  scale_fill_manual(values = c("Control" = "orange", "Treatment" = "forestgreen")) +
+  ylim(0, NA)   # start y-axis at 0
+```
+
+
+```{r}
+#We collected soil data at forrest estate, so add that in as an extra something
+soil = read.csv("../../../data/field/ForrestSoil.csv")
+
+# List of soil variables
+soil_vars <- c("bulk_density", "Total_C", "Total_N", "C.N", "OM", 
+               "SOC", "Active_C", "pH", "P_mg.l", "K_mg.l", "Mg_mg.l")
+
+
+#split up for clearer plots
+group1 <- c("Active_C", "OM", "SOC", "C.N")
+group2 <- c("P_mg.l", "K_mg.l", "Mg_mg.l", "Total_N")
+group3 <- c("pH", "bulk_density", "Total_C")
+
+plot_soil_group <- function(vars, soil_long) {
+  soil_long %>%
+    filter(Variable %in% vars) %>%
+    ggplot(aes(x = plot, y = Value, color = plot)) +
+    geom_point(size = 3, position = position_jitter(width = 0.2)) +
+    facet_grid(Variable ~ ., scales = "free_y") +
+    theme_bw() +
+    labs(x = "", y = "") +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+      strip.text = element_text(size = 12)
+    )
+}
+
+plot_soil_group(group1, soil_long)
+plot_soil_group(group2, soil_long)
+plot_soil_group(group3, soil_long)
+```
+

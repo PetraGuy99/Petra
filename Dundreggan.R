@@ -352,11 +352,6 @@ relchange1_cont = ((meantcont_f - meantcont_i)/meantcont_i)*100
 
 
 
-
-
-
-
-
 data = data.frame(
   value = c(relchange1_cont,relchange_fert1,relchange_fert2, relchange_treat1, relchange_treat2),
   group = c('control','fertiliser_1','fertiliser_2','treatment_1','treatment_2'),

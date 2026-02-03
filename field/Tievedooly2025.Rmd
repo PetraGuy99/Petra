@@ -1,0 +1,695 @@
+---
+title: "Tievedooly Monitoring Survey 2025"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  library(ggpubr)
+  library(ggplot2)
+ library(nlme)
+  library(kableExtra)
+  library(stringr)
+  library(ggpattern) 
+  library(patchwork)
+  library(lme4)
+  library(lmerTest)
+library(broom.mixed)
+  library(emmeans)
+
+  
+  knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+})
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+#read raw data
+data = read_excel('../../../data/field/Tievedooly2025.xlsx')
+
+
+
+sheets <- excel_sheets('../../../data/field/Tievedooly2025.xlsx')  # get sheet names
+
+# read all sheets into a named list, suppressing the New names messages
+all_sheets <- suppressMessages(
+  lapply(sheets, function(s) {
+    read_excel('../../../data/field/Tievedooly2025.xlsx', sheet = s)
+  })
+)
+
+names(all_sheets) <- sheets
+
+# remove meta and stats sheets
+all_sheets <- all_sheets[-c(1,2)]
+
+# have the misnamed col with the space in it - rename
+all_sheets = lapply(all_sheets, function(df) {
+   if ("Height _1" %in% names(df)) {
+    df <- df %>% rename(Height_1 = `Height _1`)
+  }
+
+})
+
+all_sheets = lapply(all_sheets, function(df) {
+   if ("Height _0" %in% names(df)) {
+    df <- df %>% rename(Height_0 = `Height _0`)
+  }
+
+})
+
+#calc delta_h 
+data_list<- lapply(all_sheets, function(df) {
+  df %>% mutate( delta_h = Height_1 - Height_0) %>%
+    mutate(delta_rcd = Rcd_1 - Rcd_0)
+})
+
+#select required columns
+data_calc = lapply(data_list, function(df) {
+  df %>% select(Tree_Species, Treatment, Health_1, delta_h, delta_rcd )
+})
+
+#make long df
+df_long <- bind_rows(
+  data_calc,
+  .id = "Plot"
+)
+
+
+```
+
+INTERNAL DOCUMENT ONLY\newline \newline
+
+SUMMARY\newline
+Change in height greater for pelleted trees than control for all tree species. \newline
+Change in height due to pellet over first growing season of 4.4% for alder and 13.3% for birch - but not significant according to confidence intervals of model. \newline
+Damage to oaks meant that change in height could not be modeled. \newline
+No effect of pellet on rcd.\newline
+No effect of pellet on mortality \newline
+
+INTRODUCITON\newline
+Tievedooly is Nature Trust site in Eire. 5 control and 5 treatment1 plots were planted with Alnus, Quercus and Betula. NT took the start heights just after planting in March 2025 and RT took the second measurement in November 2025.
+
+TREATMENTS\newline
+Pellet/control with 3 tree species
+
+METHODS\newline
+NT laid out 10 plots, 5 control and 5 pellet. PAX-COR-001 was supplied. Each plot approximately 40 trees, a mix of alder, birch and oak. Proportions of each tree species varied slightly between plots. Heights and rcd were recorded in March and November 2025. 
+
+
+ANALYSIS\newline
+For these data we will explore change in height, health and mortality. Since trees are planted in plots which can be grouped to form 5 blocks, modelling of response is possible
+
+\newpage
+CHANGE IN HEIGHT
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#box plots of delta h in different health groups as reality check
+
+p1 = ggplot(df_long, aes(x = factor(Health_1), y = delta_h)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # color & fill
+   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # horizontal line at 0
+  labs(
+    x = "Health class (Health_1)",
+    y = "Change in height (delta_h)",
+   ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12)
+  )
+
+
+ 
+ p1 
+```
+Data check - Change in height by health class for all trees\newline
+The box plots show are some negatives for health 2 trees, some are large. Looking at the raw data there are no comments for these data points, so these are either errors in Health_1 entry, or they were damaged but it was not obvious when measuring. For instance, browsing on a sapling tip which has since regrown from a side shoot and the tip damage is now not obvious. 
+
+
+\newpage
+
+The table shows number and proportion of negative delta_h by treatment and tree species. The proportion of negative values is higher than expected for oak. 
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+
+#look at negative delta h in healthy trees
+df_neg <- df_long %>%
+  filter(Health_1 == 2) %>%
+  mutate(neg_delta = delta_h < 0)
+
+neg_summary <- df_neg %>%
+  group_by(Treatment, Tree_Species) %>%
+  summarise(
+    n_total = n(),
+    n_negative = sum(neg_delta, na.rm = TRUE),
+    prop_negative = n_negative / n_total,
+    .groups = "drop"
+  )
+
+neg_summary
+
+ ggplot(neg_summary,
+       aes(x = Treatment,
+           y = prop_negative,
+           fill = Tree_Species)) +
+  geom_col(position = position_dodge(width = 0.8)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(title = "Proportion of negative change in height values",
+       subtitle = "Health_1 == 2 only",
+       y = "Proportion negative",
+       x = "Treatment",
+       fill = "Tree species") +
+  theme_minimal()
+
+
+
+
+
+```
+
+
+Bar plots show that most of the negative changes in height are attributed to oak. The oak plots at this site were noted as being subjected to heavy browsing as well as ill health due to cankers.
+
+
+\newpage
+
+The table below summarize negative delta_h by plot for oak only. The negative values occur across all plots - suggesting this is not a bias due to particular technicians (4 technicians collected data)
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#box plots of delta h in different health groups as reality check
+df_quercus_neg <- df_long %>%
+  filter(Tree_Species == "Quercus",
+         Health_1 == 2,
+         delta_h < 0)
+
+# Quick histogram of negative delta_h values
+p1 = ggplot(df_quercus_neg, aes(x = delta_h)) +
+  geom_histogram(binwidth = 1, fill = "firebrick", color = "black") +
+  scale_x_continuous(breaks = seq(floor(min(df_quercus_neg$delta_h)),
+                                  ceiling(max(df_quercus_neg$delta_h)), by = 1)) +
+  labs(title = "Distribution of negative delta_h values for Quercus",
+       subtitle = "Health_1 == 2 only",
+       x = "delta_h (cm) (negative values only)",
+       y = "Count") +
+  theme_minimal()
+
+
+#how the negs are distributed amoung plots
+oak_neg_summary <- df_long %>%
+  filter(Tree_Species == "Quercus", Health_1 == 2) %>%
+  group_by(Plot) %>%
+  summarise(
+    n_total       = n(),
+    n_negative    = sum(delta_h < 0, na.rm = TRUE),
+    prop_negative = n_negative / n_total,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n_negative))
+
+oak_neg_summary
+
+p1 
+```
+Histogram of negative delta h for oak by plot.\newline
+The histogram shows multiple small negative values, usually indicating measurement errors, however we don't usually see this number. For some plots at least half the values are negative. Since the oaks at the site were noted as being subject to heavy browsing, and these negative errors are occurring across all plots and all technicians, it seems likely that this is a browsing effect which is not clear on inspection of the tree. These data cannot be easily incorporated into the analysis since the size of the negative is a random effect how where the tree was browsed rather than being related to growth variables. 
+
+With only around 11 oaks per plot, omitting these data points leaves only a handful for analysis. This uneven and low replication for Quercus means that estimates of treatment effects for this species might be less precise, and the residual variance relatively high.
+
+For this data we will therefore only present data for change in height of health_2 oaks after omitting negative values, but these should be interpreted cautiously. 
+
+The first table below shows the number of health 2 trees per plot with delta_h >= 0.
+
+The second table shows the number of health 2 trees with delta_h greater than 0 since below you will see that we infact carry a log transform and therefore need to remove height = 0. 
+```{r, echo=FALSE, warning=FALSE, fig.height=9, fig.width=7, fig.pos='H'}
+
+# Summarise number of trees per Tree_species × Plot
+
+#this for delta h includes zeros
+tree_counts0 <- df_long %>%
+  filter(Health_1 == 2, delta_h >= 0) %>%
+  group_by(Tree_Species, Plot) %>%
+  summarise(n_trees = n(), .groups = "drop") %>%
+  arrange(Tree_Species, Plot)
+
+# Pivot to wide format: plots as columns
+tree_counts_wide0 <- tree_counts0 %>%
+  pivot_wider(names_from = Plot, values_from = n_trees, values_fill = 0)
+
+
+tree_counts_wide0
+ #this for delta h strictly > 0
+tree_counts1 <- df_long %>%
+  filter(Health_1 == 2, delta_h > 0) %>%
+  group_by(Tree_Species, Plot) %>%
+  summarise(n_trees = n(), .groups = "drop") %>%
+  arrange(Tree_Species, Plot)
+
+# Pivot to wide format: plots as columns
+tree_counts_wide1 <- tree_counts1 %>%
+  pivot_wider(names_from = Plot, values_from = n_trees, values_fill = 0)
+
+
+tree_counts_wide1
+```
+
+
+The table shows the mean change in height for each tree species and treatment across the whole site.
+
+Change in height is greater for all tree species in pelleted trees.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=9, fig.width=7, fig.pos='H'}
+
+#box plots of change in height
+# Filter data for only Control and Pellet treatments and healthy trees
+df_box <- df_long %>%
+  filter(Health_1 == 2,
+         delta_h >= 0,
+         Treatment %in% c("Control", "Pellet"))
+
+# Define colors
+treatment_colors <- c("Control" = "orange", "Pellet" = "forestgreen")
+
+# Plot
+p1 = ggplot(df_box, aes(x = Tree_Species, y = delta_h, fill = Treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +
+  scale_fill_manual(values = treatment_colors) +
+  labs(
+    title = "",
+    x = "Tree species",
+    y = "Change in height (cm)",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+
+# Filter data for Control and Pellet, healthy trees only
+df_bar <- df_long %>%
+  filter(Health_1 == 2,
+         delta_h >= 0,
+         Treatment %in% c("Control", "Pellet"))
+
+# Compute mean and SE by Tree_species and Treatment
+summary_df <- df_bar %>%
+  group_by(Tree_Species, Treatment) %>%
+  summarise(
+    mean_delta_h = mean(delta_h),
+    se_delta_h = sd(delta_h) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# Define colors
+treatment_colors <- c("Control" = "orange", "Pellet" = "forestgreen")
+
+# Plot bar chart with SE
+p2 = ggplot(summary_df, aes(x = Tree_Species, y = mean_delta_h, fill = Treatment)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h, ymax = mean_delta_h + se_delta_h),
+                width = 0.2, position = position_dodge(width = 0.8)) +
+  scale_fill_manual(values = treatment_colors) +
+  labs(
+    title = "",
+    x = "Tree species",
+    y = "Mean change in height (cm)",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+summary_df
+
+p1 / p2
+
+```
+Box plots and bar charts on means with se of change in height across all plots - for health_2 trees with -ve values removed
+\newpage
+
+MODELLING CHANGE IN HEIGHT
+
+For alder and birch CL1/TM1, CL2/TM2 etc are combined to form each of 5 treatment blocks. A mixed effects model with block as random is carried out on birch and alder separately - because it probably doesn't makes sense to compare alder to birch at a single site. 
+
+A linear mixed effects model, \newline
+model_betula <- lmer(delta_h ~ Treatment + (1|MiniPlot), data = df_betula), \newline
+was run and validated, followed by a log transform \newline
+model_betula_log <- lmer(log(delta_h) ~ Treatment + (1|MiniPlot), data = df_betula_log) \newline
+after insection of residuals. \newline 
+Charts and tables below show model validation
+
+```{r, echo=FALSE, warning=FALSE, fig.height=3, fig.width=3, fig.pos='H'}
+df <- df_long %>%
+  mutate(MiniPlot = case_when(
+    Plot %in% c("CL1","TM1") ~ "Plot1",
+    Plot %in% c("CL2","TM2") ~ "Plot2",
+    Plot %in% c("CL3","TM3") ~ "Plot3",
+    Plot %in% c("CL4","TM4") ~ "Plot4",
+    Plot %in% c("CL5","TM5") ~ "Plot5",
+  ))
+
+df_model <- df %>%
+  filter(Health_1 == 2, delta_h >= 0) %>%   # only healthy, non-negative
+  mutate(
+    Tree_species = factor(Tree_Species),
+    Treatment = factor(Treatment),
+    Plot = factor(Plot)
+  )
+
+
+# For Betula only
+df_betula <- df_model %>% filter(Tree_Species == "Betula")
+model_betula <- lmer(delta_h ~ Treatment + (1|MiniPlot), data = df_betula)
+
+#validate betula model
+#1normality of residuals
+#h0 - data is normal, low p rejects
+shapiro.test(resid(model_betula)) # p = 2e-9 - data not normal
+qqnorm(residuals(model_betula)) #bowl shape - suggests long tails, try log transform
+plot(model_betula) # notice that the random effects do not add to the data, it all collapses to two points
+
+#try log model but cant have zero values - omit these
+df_betula_log = df_betula %>% filter(delta_h > 0)
+model_betula_log <- lmer(log(delta_h) ~ Treatment + (1|MiniPlot), data = df_betula_log)
+shapiro.test(resid(model_betula_log)) 
+qqnorm(residuals(model_betula_log))
+plot(model_betula_log) # see that random effects do exist now
+
+#the log data is normal (shapiro wilk 0.08) - use this
+
+# For Alnus only
+df_alnus <- df_model %>% filter(Tree_Species == "Alnus")
+model_alnus <- lmer(delta_h ~ Treatment + (1|MiniPlot), data = df_alnus)
+
+#validate model
+shapiro.test((resid(model_alnus))) #p = 1.7e-7 not normal
+qqnorm(residuals(model_alnus)) #not as bad as birch, but try log transform anyway
+plot(model_alnus)
+
+#try log modelm but cant have zero values - omit these
+df_alnus_log = df_alnus %>% filter(delta_h > 0)
+model_alnus_log <- lmer(log(delta_h) ~ Treatment + (1|MiniPlot), data = df_alnus_log)
+shapiro.test(resid(model_alnus_log)) # p = 0.001 - still bit not normal
+qqnorm(residuals(model_alnus_log)) # doesnt look too bad
+plot(model_alnus_log)
+
+```
+
+
+The shapiro-wilk suggested the residuals of models using un-transformed data were not normal, in addition the random effects for birch collapsed into a single mean for each treatment. Log transformed birch data increased normality of residuals (shapiro-wilks p =0.08), improved linearity of qqplot and introduced a random effect due to plot. log transforming the alnus data did improve normality of residuals of the model (shapiro-wilk p = 0.001), although qqplots and residuals plots looked reasonably linear and homogeneous before and after transformation. Since the data is change in height with no negative values, positive skew is to be expected and a log transform appropriate.
+Therefore log transformed change in height will be used for mixed effects models after observing non-linear residuals in model without transformation. The non-normality is probably due to long tails in data which cannot be negative but may have a few high values.
+
+The table shows the effect sizes for the log transformed data - the un-transformed effect sizes is then exp(0.0429) for alder and exp(0.125) for birch.\newline
+
+Alder: exp(0.0429) = 0.0438. Gives multiplicative change of 1.044 or 4.4%\newline
+Birch: exp(0.125) = 1.133. Give multiplicative change of 13.3% \newline
+
+Treatment increased change in height by 4.4% for alder and 13.3% for birch relative to control adjusted for random effect of blocks.\newline
+
+```{r echo=FALSE, fig.height=5, fig.pos='H', fig.width=7, warning=FALSE}
+df <- df_long %>%
+  mutate(MiniPlot = case_when(
+    Plot %in% c("CL1","TM1") ~ "Plot1",
+    Plot %in% c("CL2","TM2") ~ "Plot2",
+    Plot %in% c("CL3","TM3") ~ "Plot3",
+    Plot %in% c("CL4","TM4") ~ "Plot4",
+    Plot %in% c("CL5","TM5") ~ "Plot5",
+  ))
+
+df_model <- df %>%
+  filter(Health_1 == 2, delta_h >= 0) %>%   # only healthy, non-negative
+  mutate(
+    Tree_species = factor(Tree_Species),
+    Treatment = factor(Treatment),
+    Plot = factor(Plot)
+  )
+
+
+# For Betula only
+df_betula <- df_model %>% filter(Tree_Species == "Betula")
+df_betula_log = df_betula %>% filter(delta_h > 0)
+model_betula_log <- lmer(log(delta_h) ~ Treatment + (1|MiniPlot), data = df_betula_log)
+
+
+df_alnus <- df_model %>% filter(Tree_Species == "Alnus")
+df_alnus_log = df_alnus %>% filter(delta_h > 0)
+model_alnus_log <- lmer(log(delta_h) ~ Treatment + (1|MiniPlot), data = df_alnus_log)
+
+
+
+tidy_betula <- broom.mixed::tidy(model_betula_log, effects = "fixed", conf.int = TRUE)
+tidy_betula_plot <- tidy_betula %>%
+  select(term, estimate, conf.low, conf.high) %>%
+  rename(lower = conf.low, upper = conf.high) %>%
+  mutate(Species = 'Betula')
+
+tidy_alnus <- broom.mixed::tidy(model_alnus_log, effects = "fixed", conf.int = TRUE)
+tidy_alnus_plot <- tidy_alnus %>%
+  select(term, estimate, conf.low, conf.high) %>%
+  rename(lower = conf.low, upper = conf.high) %>%
+  mutate(Species = 'Alnus')
+
+coef_all = bind_rows(tidy_alnus_plot, tidy_betula_plot)
+
+coef_all <- coef_all %>%
+  filter(grepl("Treatment", term))
+
+p1 = ggplot(coef_all, aes(x = estimate, y = Species)) +
+  geom_point(aes(color = Species), size = 3) +
+  geom_errorbarh(aes(xmin = lower, xmax = upper, color = Species), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  labs(
+    title = "",
+    x = "Effect size for log(change in height (cm))",
+    y = "Species"
+  ) +
+  scale_color_manual(values = c("Alnus" = "forestgreen", "Betula" = "forestgreen")) +
+  theme_minimal(base_size = 14)+
+  theme(legend.position = "none")
+
+coef_all
+
+p1
+
+```
+The graph shows the effect sizes for alder and birch from separate mixed effects models, plotted together for neatness. Notice the the confidence intervals cross zero, so that these results are not significant.
+\newpage
+HEALTH AND MORTALITY
+
+```{r echo=FALSE, fig.height=5, fig.pos='H', fig.width=7, warning=FALSE}
+#summarise counts of health by tree and treatment as % of starting number
+
+health_counts <- df_long %>%
+  group_by(Tree_Species, Treatment, Health_1) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  pivot_wider(
+    names_from = Health_1,
+    values_from = n,
+    values_fill = 0
+  ) %>%
+  mutate(
+    dead = `0` + `NA`,
+    total = `0` + `1` + `2` + `NA`, # including NA because making it relevant to what was planted
+    dead = (dead / total) * 100,
+    unhealthy = (`1` / total) * 100,
+    healthy = (`2` / total) * 100
+  )
+  
+health_long <- health_counts %>%
+  pivot_longer(
+    cols = c("dead", "unhealthy", "healthy"), 
+    names_to = "Health", 
+    values_to = "Percent"
+  )
+
+health_table =  health_counts %>% select(Tree_Species, Treatment,dead, unhealthy, healthy)
+
+health_table
+
+ggplot(health_long, aes(x = Tree_Species, y = Percent, fill = Treatment)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~Health) +  # optional: one panel per health category
+  scale_fill_manual(values = c("Control" = "orange", "Pellet" = "forestgreen")) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = "",
+    y = "Percent",
+    fill = "Treatment"
+  )+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1) 
+  )  
+```
+
+The bar chart shows the percentage of trees within each treatment which have been counted as unhealthy (browsed, dead top, cankers etc) or healthy. Note that dead here includes missing trees which we are assuming weren't found because they died. At some sites we would not include missing trees as dead in this way, because it might be that we have just not found them, But here, since the plots were small is was obvious the the missing trees were dead. As was observed by technicians, the oaks show the most damage and highest mortality. Most of the dead birch are missing trees, and most of these were missing from plot 5. Nine birch were missing in CL5 and 6 from TM5. 
+
+\newpage
+ROOT COLLAR DIAMETER
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#box plots of delta RCD . not relevant to health group - lets just examine
+
+p1 = ggplot(df_long, aes(x = factor(Health_1), y = delta_rcd)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # color & fill
+   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # horizontal line at 0
+  labs(
+    x = "Health class (Health_1)",
+    y = "Change in rcd (mm)",
+   ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12)
+  )
+
+
+ 
+ p1 
+```
+
+Box plots shows distribution of negative values of change in rcd by health group, not so relevant, but just as data check, we can see -ves in both group 1 and group 2. For change in rcd we can include health group 1. 
+
+
+
+The table details the proportions of negative rcd by tree species and treatment - showing that most are in oaks
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+
+#look at negative delta rcd in healthy trees
+df_neg <- df_long %>%
+  mutate(neg_delta = delta_rcd < 0)
+
+neg_summary <- df_neg %>%
+  group_by(Treatment, Tree_Species) %>%
+  summarise(
+    n_total = n(),
+    n_negative = sum(neg_delta, na.rm = TRUE),
+    prop_negative = n_negative / n_total,
+    .groups = "drop"
+  )
+
+neg_summary
+
+ ggplot(neg_summary,
+       aes(x = Treatment,
+           y = prop_negative,
+           fill = Tree_Species)) +
+  geom_col(position = position_dodge(width = 0.8)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(title = "Proportion of negative change in rcd",
+       subtitle = "Health_1 == 1 and 2",
+       y = "Proportion negative",
+       x = "Treatment",
+       fill = "Tree species") +
+  theme_minimal()
+
+
+
+
+
+```
+
+The bar plot shows the proportion of negative values by species, and most occur for the oaks. This is expected for several reasons. Oaks can have a very flared root collar, hence there is a large change in diameter in the region where measurement is taking place. Any browsing and damage will cause the stem to become oval, leading to errors due to orientation of the calipers. 
+
+The table shows the number of trees of health 1 and 2 remaining in each plot when those with negative rcd are removed. As with heights, there are few trees remaining in the oak plots.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+# Summarise number of trees per Tree_species × Plot
+tree_counts0 <- df_long %>%
+  filter((Health_1 %in% c(1, 2)), delta_rcd >= 0) %>%
+  group_by(Tree_Species, Plot) %>%
+  summarise(n_trees = n(), .groups = "drop") %>%
+  arrange(Tree_Species, Plot)
+
+# Pivot to wide format: plots as columns
+tree_counts_wide0 <- tree_counts0 %>%
+  pivot_wider(names_from = Plot, values_from = n_trees, values_fill = 0)
+
+
+
+
+tree_counts_wide0
+```
+
+the table shows mean change in rcd for each tree species and treatment.
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=9, fig.width=7, fig.pos='H'}
+
+#box plots of change in height
+# Filter data for only Control and Pellet treatments and healthy trees
+df_box <- df_long %>%
+  filter(Health_1 == 2,
+         delta_h >= 0,
+         Treatment %in% c("Control", "Pellet"))
+
+# Define colors
+treatment_colors <- c("Control" = "orange", "Pellet" = "forestgreen")
+
+# Plot
+p1 = ggplot(df_box, aes(x = Tree_Species, y = delta_rcd, fill = Treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +
+  scale_fill_manual(values = treatment_colors) +
+  labs(
+    title = "",
+    x = "Tree species",
+    y = "Change in rcd (mm)",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+
+# Filter data for Control and Pellet, healthy trees only
+df_bar <- df_long %>%
+  filter(Health_1 == 2,
+         delta_rcd >= 0,
+         Treatment %in% c("Control", "Pellet"))
+
+# Compute mean and SE by Tree_species and Treatment
+summary_df <- df_bar %>%
+  group_by(Tree_Species, Treatment) %>%
+  summarise(
+    mean_delta_rcd = mean(delta_rcd),
+    se_delta_rcd = sd(delta_rcd) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# Define colors
+treatment_colors <- c("Control" = "orange", "Pellet" = "forestgreen")
+
+# Plot bar chart with SE
+p2 = ggplot(summary_df, aes(x = Tree_Species, y = mean_delta_rcd, fill = Treatment)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = mean_delta_rcd - se_delta_rcd, ymax = mean_delta_rcd + se_delta_rcd),
+                width = 0.2, position = position_dodge(width = 0.8)) +
+  scale_fill_manual(values = treatment_colors) +
+  labs(
+    title = "",
+    x = "Tree species",
+    y = "Mean change in rcd (mm)",
+    fill = "Treatment"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+summary_df
+
+p1 / p2
+
+```
+
+Box plots and bar charts show the distribution and mean change in rcd for each tree species.
+I dont think there's much point putting this into a model, for the alder we're looking at 0.5mm mean difference. 
+\newpage
+DISCUSSION
+The oaks suffered from high levels of browsing which resulted in spurious negative changes in height. This in turn reduced the number of data points available and meant that effect sizes for growth could not be modeled. 
+
+GOING FORWARD
+I would suggest that we do not re-measure this site since it has a small number of trees, has suffered a lot of browsing, and is expensive to get to. Perhaps NT can continue to collect data. Oak data will have to account for the browsing.  If a further time point is collected in 2026, it could be expected that there will be more growth and the impact of the initial browsing might be absorbed giving more non-negative changes in height - however, there is still the issue that the effective start height of the tree has changed to the browsing point - which is not known. It might be possible to omit the first time point and use change in height from the second to third time point - if no further tip browsing has taken place. 

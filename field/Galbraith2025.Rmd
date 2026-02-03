@@ -1,0 +1,2439 @@
+---
+title: "Galbraith Monitoring Survey 2025"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  library(ggpubr)
+  library(ggplot2)
+ library(nlme)
+  library(kableExtra)
+  library(stringr)
+  library(ggpattern) 
+  library(patchwork)
+  library(lme4)
+  library(lmerTest)
+library(broom.mixed)
+  library(emmeans)
+
+  
+  knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+})
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+#read raw data
+data = read_excel('../../../data/field/Galbraith2025.xlsx')
+
+
+
+sheets <- excel_sheets('../../../data/field/Galbraith2025.xlsx')  # get sheet names
+
+# read all sheets into a named list, suppressing the New names messages
+all_sheets <- suppressMessages(
+  lapply(sheets, function(s) {
+    read_excel('../../../data/field/Galbraith2025.xlsx', sheet = s)
+  })
+)
+
+names(all_sheets) <- sheets
+
+# remove meta and stats sheets
+all_sheets <- all_sheets[-c(1,2)]
+
+
+```
+
+INTERNAL DOCUMENT ONLY
+
+SUMMARY
+
+Sitka: Mixed results with large within site variations. In general fertilized plots lead to better growth but worse mortality, but the growth differences are varied and small. At a site level, pelleted plots show a small increase in height compared to control (less than 1cm), fertilizer, on average across the site gives around 2cm improvement. 
+
+At a site level pellet reduces mortality in Sitka by 1% compared to control whereas fertilized plots show 4% higher mortality.
+
+Norway: Clear pattern of change in height being greatest for pelleted plots for both cell grown and bare root trees. Across the site pelleted trees show around 2.4cm greater change in height compared to control, with fertilized trees showing 1.3cm change. 
+
+Mortality lowest in pelleted plots for both cell grown and bare root, fertilized plots showing higher mortality than control for cell grown but lower for bare root. Overall across both sapling types mortality in pelleted plots is 7% less than control where fertilized plots it is 2% greater. 
+
+Pine: Overall pellet resulted in greater change in height, but data may be unreliable due to high weevil damage in cell grown plots. As with Norway, clear pattern of pelleted trees showing greatest change in height for both cell grown and bare root. Across the site pelleted trees show on average 3.5cm greater change in height whereas fertilized tree show 1cm. Bare root pines suffered most weevil damage at this site, if we ignore that plot, then cell grown pelleted trees showed 4.5cm change in height compared to control, whereas fertilized trees saw 1.9cm change. 
+
+Mortality is lower in pelleted plots than controls, with cell grown fertilized plots showing the lowest mortality but bare root fertilized trees showing the highest. Across both sapling types pelleted plots show 2% reduction in mortality compared to control whereas fertilized plots show 8% increase. However, this increase dominated by data from the the heavily browsed cell grown plot and hence may not be a reliable metric. If we eliminate those plots, then pelleted trees show 3% reduced mortality compared to control, fertilized trees show 10% reduced mortality. 
+
+
+INTRODUCTION
+
+Galbraith is a large site with Norway (Picea abies), Sitka (Picea sitchensis) and Pine (Pinus contorta). We were allocated plots by the customer who also wanted to explore differences between cell (cell) grown, bare root (bare), vegetatively propagated (VP) and improved (IMP) trees. This lead to a large number of trees being recorded - 3300 - Some plots that the customer requested we measured were not done due to time constraints. (I think we omitted VP Cell grown for Sitka). We spent around 16 people days at this site due to the additional treatments - which have limited interest to Rhizocore. If we were planning to record data here as per our current set up, we would monitor around 980 trees and spend around 8 people days. We have not informed the customer of the missing plots. Note that this site was planned and planted before we had our instigated our current experimental set up. We were 'invited' by the customer to send a set up to them, but this was in the period of time when we had only just finished measuring the legacy sites, we were looking at the data from those, and had not yet gone on to critique the monitoring and design our new set up. TBH, this was a big rush before xmas last year, after we have got back from a batch of measuring and I was trying to get the nursery set up and a set of data analysed. The customer came to us with a few days to get them a design, which I didnt do. I labour this point, because below I say that we can only explore the data and not carry out tests because of the set up, potentially they could say - you were asked for a plan and didn't supply one. 
+
+TREATMENTS
+
+Pine/Norway : cell and bare root with fertilizer, control and pellet - one plot each treatment only. 
+
+6 treatments per tree species in 6 adjacent plots
+
+
+Sitka:
+
+(VPbare, Impbare, Impcell) and 2 sites, with 3 treatments (control, fertilized, pellet).
+
+9 treatments across 2 different locations.
+
+For all tree species we do not have repeats although 2 repeats for Sitka, hence models and tests cannot be carried out.We can do a data exploration and compare differences in means etc. 
+
+Two fungal spp were supplied, Pax and Heb - we don't know where they went. It is possible that all Heb went to one tree spp, but they could have applied heb to some of the sitka and pax to the rest. Therefore below - if pelleted plots show label of Paxillus - take this as 'Pellet' - we cannot be sure of species.
+
+METHODS
+
+Because this was clear fell with VERY disrupted soil, we made a note of planting condition on a scale of 1-4, with 1 being in top soil, 2 being on a mound, 3 being subsoil and 4 being in a pile of rock.
+
+The graphs show change in height of health 2 with delta h > or = 0. Note that 100 trees were recorded in each plot, once these were filtered, this number is reduced to between around 50 to 90 trees per plot due to difference in mortality and health. Once trees of health 1 and 0 are removed, a small number of trees still showed a large negative change in height. Since this it not possible, it is most likely an error in either recording (health was not entered or entered incorrectly) or due to ground conditions - soil washed down and over the sapling or rocks into which some trees were planted had moved. When repeated trees were measured by different technicians, a error of around 1cm was seen, and some measurement error is inevitable. Therefore any differences greater than this are most likely due to other factors which are not relevant to strict changes in height. Therefore trees with -ve changes in height have been removed from the change in height data
+
+The data here is for the first growing season at the site - initial measurement just after planting, second measurement at the end of the first growing season ~9months later.
+
+When trees are measured at the second time point, a coarse 'health' value is recorded. 0 for dead, 2 for healthy and 1 for a tree showing any signs of ill-health or damage. For instance, 1 would be recorded for trees with weevil or mammal browsing, dead tops due to browsing, or chlorosis. Mortality is calculated from counted from these Health 0 trees. Mortality here is count of health_0 trees / count of (health 0 + health 1 + health 2). That is - we do not divide by 100, but by the total number of trees monitored at second time point. (We could equally divide by number of NA in Health or Height) Some trees are lost because tags disappear. Therefore the number of trees measured at the second time point is always less than the 100 initially tagged.
+
+ANALYSIS
+
+In this exploration we will look at:
+Changes in height across the three tree species and treatments
+Mortality across the three tree species
+Influence of planting condition (rock, subsoil etc) on mortality and change in height
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+#PREPARE ALL THE  DATA HERE INTO EACH SPECIES
+#Need to extract the relevant columns, Site (1,2) Height_0, Height_1, EMF_Species(pellet, control, fert, emf is #all pax) Growth (bare, cell) VP_IMP (VP,IMP) this column differentiates the vegetatively propagated versus the #cell grown Sitka. Galbraith wanted to look for differences here - not something we were interested in. It might #be worth looking at initial heights and delta_h for these and potentially using them as different random #effects.
+
+#sitka sheets extracted, columns selected, site and plot column contents tidied, delta h added
+sitka_sheets <- names(all_sheets)[grep("^Sitka", names(all_sheets))]
+
+sitka_list <- all_sheets[sitka_sheets]
+
+sitka_list<- lapply(sitka_list, function(df) {
+  df %>%
+      select(Site, Height_0, Height_1, Soil_0, EMF_species, Growth, VP_IMP, Health_1)
+})
+
+#Note that site column is Sitka112, for site 1 plot 12, need to change this to site 1 or 2.
+sitka_list<- lapply(sitka_list, function(df) {
+  # Extract the number after "Sitka"
+  numbers <- sub("Sitka", "", df$Site)  # removes "Sitka", leaves "112" etc.
+  
+  # ActualSite: first digit
+  df$ActualSite <- as.integer(substr(numbers, 1, 1))
+  
+  # ActualPlot: remaining digits
+  df$ActualPlot <- as.integer(substr(numbers, 2, nchar(numbers)))
+  
+  df
+})
+
+#Calculate the change in heights
+
+sitka_list <- lapply(sitka_list, function(df) {
+  df$delta_h <- df$Height_1 - df$Height_0
+  df
+})
+
+# make a long df
+# this df has all trees in of all health - some will be used for mortality etc - 
+#but height charts below will re-filter the -ves out of this as required
+sitka_df <- bind_rows(sitka_list)
+
+
+#prepare the Norway data########################################################
+
+#norwaysheets extracted, columns selected, site and plot column contents tidied, delta h added
+norway_sheets <- names(all_sheets)[grep("^NS", names(all_sheets))]
+
+norwaylist <- all_sheets[norway_sheets]
+
+norway_list<- lapply(norwaylist, function(df) {
+  df %>%
+      select(Site, Height_0, Height_1, Soil_0, EMF_species, Growth, Health_1)
+})
+
+
+#Calculate the change in heights
+
+norway_list <- lapply(norway_list, function(df) {
+  df$delta_h <- df$Height_1 - df$Height_0
+  df
+})
+
+# make a long df
+# this df has all trees in of all health - some will be used for mortality etc - 
+#but height charts below will re-filter the -ves out of this as required
+norway_df <- bind_rows(norway_list)
+
+
+#prepare the pine###########################
+
+pine_sheets <- names(all_sheets)[grep("^Pine", names(all_sheets))]
+
+pinelist <- all_sheets[pine_sheets]
+
+pine_list<- lapply(pinelist, function(df) {
+  df %>%
+      select(Site, Height_0, Height_1, Soil_0, EMF_species, Growth, Health_1)
+})
+
+
+#Calculate the change in heights
+
+pine_list <- lapply(pine_list, function(df) {
+  df$delta_h <- df$Height_1 - df$Height_0
+  df
+})
+
+# make a long df
+# this df has all trees in of all health - some will be used for mortality etc - 
+#but height charts below will re-filter the -ves out of this as required
+pine_df <- bind_rows(pine_list)
+
+```
+
+\newpage
+
+```{r, echo=FALSE, warning=FALSE, fig.height=9, fig.width=7, fig.pos='H'}
+#box plots of delta h in different health groups as reality check
+
+p1 = ggplot(sitka_df, aes(x = factor(Health_1), y = delta_h)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # color & fill
+   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # horizontal line at 0
+  labs(
+    x = "Health class (Health_1)",
+    y = "Change in height (delta_h)",
+    title = 'sitka'
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12)
+  )
+
+p2 = ggplot(norway_df, aes(x = factor(Health_1), y = delta_h)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # color & fill
+   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # horizontal line at 0
+  labs(
+    x = "Health class (Health_1)",
+    y = "Change in height (delta_h)",
+    title = 'norway'
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12)
+  )
+
+ p3 = ggplot(pine_df, aes(x = factor(Health_1), y = delta_h)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # color & fill
+   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # horizontal line at 0
+  labs(
+    x = "Health class (Health_1)",
+    y = "Change in height (delta_h)",
+    title = 'pine'
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12)
+  )
+ 
+ p1 / p2 / p3 
+``` 
+The box plots show changes in height by health category for each species to. note the negative values which have been removed as per methods explanation.
+\newpage
+
+SITKA CHANGES IN HEIGHT
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+#PLOT OF START HEIGHTS
+ggplot(sitka_df, aes(x = factor(ActualPlot), y = Height_0)) +
+  geom_boxplot() +
+  facet_wrap(~ ActualSite, scales = "free_x") +
+  labs(
+    x = "Plot",
+    y = "Starting height (cm)"
+  ) +
+  theme_bw()
+ 
+```
+Sitka start heights
+4,5,6 = VP BARE, 7,8,9 IMP CELL, 10,11,12 = IMP BARE
+
+Starting heights for trees in plots 10,11,12 were much greater. That is, The improved bare started taller than both the VP bare root or the improved cell grown trees. The improved cell grown and VP bare trees were a similar starting height.
+
+
+Table shows the number of healthy trees with positive change in height in each plot that we use for change in height of each plots. Only trees of health_2 are used.
+
+
+```{r, echo=FALSE, warning=FALSE}
+# BOX PLOT FOR CHANGE IN HEIGHTS - FILTERED BY HEALTH == 2 and table of number trees per plot
+#need to filter the Health_1 == 0 out of these - they are the dead trees, which are 
+#recorded as final height = 0, hence giving negative delta h
+
+# make a long df with only health 2 and delta h > 0
+sitka_df_healthy <- bind_rows(sitka_list) %>% filter(Health_1 == 2 & delta_h >= 0)
+
+# Count trees per site and plot
+tree_counts_wide <- sitka_df_healthy %>%
+  group_by(ActualSite, ActualPlot) %>%
+  summarise(
+    n_trees = n(),
+    .groups = "drop"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = ActualPlot,
+    values_from = n_trees,
+    names_prefix = "Plot_"
+  )
+
+# Only print the kable table
+tree_counts_wide %>%
+  kable(
+    digits = 0,
+    booktabs = TRUE,
+    caption = "Number of healthy trees per Site and Plot"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+ggplot(sitka_df_healthy, aes(x = factor(ActualPlot), y = delta_h, fill = EMF_species)) +
+  geom_boxplot() +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Control"            = "Control",
+      "Fertiliser"         = "Fertiliser"
+    )
+  ) +
+  facet_wrap(~ ActualSite, scales = "free_x") +  # split by site if desired
+  labs(
+    x = "Plot",
+    y = "Change in height (cm)"
+  ) +
+  theme_bw()
+
+ 
+```
+
+Sitka change in height
+4,5,6 = VP BARE, 7,8,9 IMP CELL, 10,11,12 = IMP BARE
+
+Note that the IMP bare started off tallest, but has the least change in height
+
+
+A plot of initial and final mean heights illustrates differences in growth rates between treatments
+
+```{r, echo=FALSE, warning=FALSE}
+#Plot of initial and final heights 
+# Summaries mean heights by site and plot
+sitka_df_healthy <- bind_rows(sitka_list) %>% filter(Health_1 == 2 & delta_h >= 0)
+#Take only non-neg tree hts again 
+sitka_summary <- sitka_df_healthy %>%
+  group_by(ActualSite, ActualPlot) %>%
+  summarise(
+    mean_initial = mean(Height_0, na.rm = TRUE),
+    mean_final = mean(Height_1, na.rm = TRUE)
+  ) %>%
+  mutate(Treatment = case_when(
+    ActualPlot %in% c(4, 7, 10) ~ "Control",
+    ActualPlot %in% c(5, 8, 11) ~ "Fertiliser",
+    ActualPlot %in% c(6, 9, 12) ~ "Pellet",
+    TRUE ~ NA_character_
+  )) %>%
+  pivot_longer(cols = c(mean_initial, mean_final),
+               names_to = "Time",
+               values_to = "MeanHeight")
+
+# Optional: make Time factor for nicer labels
+sitka_summary$Time <- factor(sitka_summary$Time, levels = c("mean_initial", "mean_final"),
+                             labels = c("Initial", "Final"))
+
+# Map line type to ActualPlot
+line_types <- c(
+  "4" = "solid",
+  "5" = "solid",
+  "6" = "solid",
+  "7" = "dashed",
+  "8" = "dashed",
+  "9" = "dashed",
+  "10" = "dotted",
+  "11" = "dotted",
+  "12" = "dotted"
+)
+# Plot
+ggplot(sitka_summary,
+       aes(x = Time, y = `MeanHeight`, 
+           group = ActualPlot,
+           color = Treatment,
+           linetype = factor(ActualPlot))) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_color_manual(
+    values = c(
+      "Control" = "orange",
+      "Fertiliser" = "blue",
+      "Pellet" = "forestgreen"
+    )
+  ) +
+  scale_linetype_manual(
+    values = line_types,
+    name = "Plot"
+  ) +
+  facet_wrap(~ ActualSite) +
+  labs(
+    x = "Time",
+    y = "Mean height (cm)",
+    color = "Treatment"
+  ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+ 
+```
+Sitka initial and final mean heights for each plot
+4,5,6 = VP BARE, 7,8,9 IMP CELL, 10,11,12 = IMP BARE. I, 2 are sites 1 and 2
+4,7,10 = control, 5,8,11 = fertilizer, 6,9,12 = pellet
+solid lines are VP bare, dashed lines are imp cell, dotted lines are imp bare
+
+The plot shows the mean initial and final heights, slope indicates the growth rates between the treatments. At both locations plots 10,11,12 are the Improved bare root, and although these trees had the greatest height on planting they showed the least growth rate. 
+
+\newpage
+
+```{r, echo=FALSE, warning=FALSE}
+# BAR CHART FOR MEAN VALUES OF CHANGE IN HEIGHT and table of means
+#need to filter the Health_1 == 0 out of these - they are the dead trees, which are 
+#recorded as final height = 0, hence giving negative delta h
+
+# ANd remove all trees with dead tops - which we will take as delta_h < -5
+
+# make a long df
+sitka_df_healthy <- bind_rows(sitka_list) %>%
+  filter(Health_1 == 2 & delta_h >= 0)
+
+summary_df <- sitka_df_healthy %>%
+  group_by(ActualSite, ActualPlot, EMF_species) %>%  # group by site, plot, and treatment
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# PDF-safe table
+summary_df %>%
+  kable(
+    digits = 2,
+    booktabs = TRUE,
+    caption = "Mean change in height"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+
+ggplot(summary_df, aes(x = factor(ActualPlot), y = mean_delta_h, fill = EMF_species)) +
+  geom_col(position = position_dodge(width = 0.8)) +       # bar chart
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h,
+                    ymax = mean_delta_h + se_delta_h),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Control"            = "Control",
+      "Fertiliser"         = "Fertiliser"
+    )
+  ) +
+  facet_wrap(~ ActualSite, scales = "free_x") +
+  labs(
+    x = "Plot",
+    y = "Mean change height (cm)"
+  ) +
+  theme_bw()
+```
+Sitka mean change in height for each plot
+4,5,6 = VP BARE, 7,8,9 IMP CELL, 10,11,12 = IMP BARE. I, 2 are sites 1 and 2
+
+
+
+
+```{r, echo=FALSE, warning=FALSE}
+# bar plot change in height relative to control
+
+sitka_df_healthy <- bind_rows(sitka_list) %>%
+  filter(Health_1 == 2 & delta_h >= 0)
+
+summary_df <- sitka_df %>%
+  group_by(ActualSite, ActualPlot, EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+sitka_df_means <- sitka_df_healthy %>%
+  mutate(
+    Block = case_when(
+      ActualSite == 1 & ActualPlot %in% 4:6  ~ 4,
+      ActualSite == 1 & ActualPlot %in% 7:9  ~ 7,
+      ActualSite == 1 & ActualPlot %in% 10:12 ~ 10,
+      ActualSite == 2 & ActualPlot %in% 4:6  ~ 4,
+      ActualSite == 2 & ActualPlot %in% 7:9  ~ 7,
+      ActualSite == 2 & ActualPlot %in% 10:12 ~ 10
+    )
+  )
+
+summary_block <- sitka_df_means %>%
+  group_by(ActualSite, Block, EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    .groups = "drop"
+  )
+summary_diff <- summary_block %>%
+  # get Control mean for each block
+  left_join(
+    summary_block %>% filter(EMF_species == "Control") %>%
+      select(ActualSite, Block, mean_delta_h) %>%
+      rename(control_mean = mean_delta_h),
+    by = c("ActualSite", "Block")
+  ) %>%
+  mutate(
+    delta_vs_control = mean_delta_h - control_mean
+  ) %>%
+  filter(EMF_species != "Control")  # remove control rows, we only want differences
+
+
+
+
+ggplot(summary_diff, aes(x = factor(Block), y = delta_vs_control, fill = EMF_species)) +
+  geom_col(position = position_dodge(width = 0.8)) +
+  facet_wrap(~ ActualSite, scales = "free_x") +
+  scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",  # Pellet
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Fertiliser"         = "Fertiliser"
+    )
+  ) +
+  labs(
+    x = "Reference Control Plot (Block)",
+    y = "Mean change in height relative to control (cm)",
+    fill = "Treatment"
+  ) +
+  theme_bw()
+
+
+
+```
+Sitka, mean change in height relative to control for each plot
+4,5,6 = VP BARE, 7,8,9 IMP CELL, 10,11,12 = IMP BARE. I, 2 are sites 1 and 2
+Bar height is, e.g. mean change in height for VP bare Fertilized - mean change in height VP Bare Control
+
+
+The pelleted trees showed a greater change in height than control trees 4 treatments, but not at site 1 plot 4 and plot 7.
+
+Fertilized trees show greater change in height than control for all tree types. except at site 1 plot 4.
+
+Fertilized trees also show greater change in height that pelleted trees - except for site 2 plot 10 - improved bare root.
+
+Improved bare root trees treated with pellets at site 2 showed a greater increase in height than fertilized trees. 
+
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#box plot of change in heigts overall - ignoring plots AND bar chart of means of same
+sitka_df_healthy <- bind_rows(sitka_list) %>%
+  filter(Health_1 == 2 & delta_h >= 0)
+
+p1 = ggplot(sitka_df_healthy, aes(x = EMF_species, y = delta_h, fill = EMF_species)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") + # optional: show mean
+  scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    )
+  ) +
+  labs(
+    x = "Treatment",
+    y = "Change in height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    text = element_text(size = 12)
+  )
+
+
+# Summarise mean and SE
+summary_df <- sitka_df_healthy %>%
+  group_by(EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# Bar plot with SE and mean values inside bars
+p2 = ggplot(summary_df, aes(x = EMF_species, y = mean_delta_h, fill = EMF_species)) +
+  geom_col(width = 0.7) +
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h, 
+                    ymax = mean_delta_h + se_delta_h),
+                width = 0.2) +
+  geom_text(aes(label = round(mean_delta_h, 2)),
+            position = position_stack(vjust = 0.5),  # center inside the bar
+            color = "white",
+            size = 4) +
+  scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    )
+  ) +
+  labs(
+    x = "Treatment",
+    y = "Mean change in height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    text = element_text(size = 12)
+  )
+
+p1 / p2
+
+```
+Sitka, mean changes in height for all plots across the whole site - ignoring the treatment of sapling type. That is, combining VP, Cell, Bare etc across sites 1 and 2. (Ignore Paxillus involutus label - it's just Pellet, we cant be sure which species)
+
+
+
+```{r eval=FALSE, fig.height=5, fig.pos='H', fig.width=7, warning=FALSE, include=FALSE}
+
+sitka_df_healthy <- bind_rows(sitka_list) %>%
+  filter(Health_1 == 2 & delta_h >= 0)
+
+df1 <- sitka_df_healthy %>%
+  filter(ActualSite == 1) %>%
+  mutate(Growth3 = case_when(
+    VP_IMP == "VP"  & Growth == "Bare_root"  ~ "VPbare",
+    VP_IMP == "IMP" & Growth == "Cell_grown" ~ "Impcell",
+    VP_IMP == "IMP" & Growth == "Bare_root"  ~ "Impbare",
+    TRUE ~ NA_character_
+  )) %>%
+  mutate(Growth3 = factor(Growth3,
+                          levels = c("VPbare", "Impcell", "Impbare")))
+
+# Summarise at plot level
+df_plot <- df1 %>%
+  group_by(EMF_species, ActualPlot, Growth3) %>%
+  summarise(mean_delta_h = mean(delta_h),
+            sd_delta_h   = sd(delta_h),
+            n            = n(),
+            se_delta_h   = sd_delta_h / sqrt(n),
+            .groups = "drop")
+
+p1 <- ggplot(df1, aes(x = EMF_species, y = delta_h)) +
+  
+  # Tree-level data (pseudoreplicates), split by Growth treatment
+  geom_jitter(
+    aes(colour = Growth3),
+    width = 0.2,
+    alpha = 0.45,
+    size = 2
+  ) +
+  
+  # Plot-level means (same colour, distinct shape)
+  geom_point(
+    data = df_plot,
+    aes(x = EMF_species,
+        y = mean_delta_h,
+        colour = Growth3),
+    shape = 18,   # diamond
+    size = 4.5,
+    inherit.aes = FALSE
+  ) +
+  
+  geom_errorbar(
+    data = df_plot,
+    aes(x = EMF_species,
+        ymin = mean_delta_h - se_delta_h,
+        ymax = mean_delta_h + se_delta_h,
+        colour = Growth3),
+    width = 0.1,
+    linewidth = 0.8,
+    inherit.aes = FALSE
+  ) +
+  
+  labs(title = "Tree-level measurements and plot-level means by growth treatment",
+       subtitle = "Points = individual trees (nested within single plots per growth treatment)\nDiamonds = plot means ± SE",
+       x = "Treatment",
+       y = "Change in heaight (cm)",
+       colour = "Growth treatment") +
+  
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+p1
+
+
+
+
+
+
+```
+Sitka change in height by treatment and initial sapling type. Not sure if this plot is helpful. It shows each tree as a point. Possibly too many points. Doesn.t tell us anything new.
+
+\newpage
+
+NORWAY CHANGES IN HEIGHT
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+#PLOT OF norway START HEIGHTS
+ggplot(norway_df, aes(x = factor(Site), y = Height_0)) +
+  geom_boxplot() +
+  labs(x = "Site", y = "Starting height (cm)") +
+  theme_bw()
+
+
+
+```
+Norway start heights
+1,2,3 = cell grown -control, fert, pellet. 4,5,6 = bare root - control fert pellet
+The bare root trees are all smaller on planting than the cell grown. The pelleted trees in each group are all smaller at planting than fertilized or control trees.
+
+```{r eval=FALSE, fig.height=4, fig.pos='H', fig.width=7, warning=FALSE, include=FALSE}
+# BOX PLOT FOR CHANGE IN HEIGHTS OF norway - FILTERED BY HEALTH == 2
+#need to filter the Health_1 == 0 out of these - they are the dead trees, which are 
+#recorded as final height = 0, hence giving negative delta h
+
+# ANd remove all trees with dead tops - which we will take as delta_h < 0
+
+# make a long df with only health 2 and delta h > -2
+norway_df_healthy <- norway_df %>% filter(Health_1 == 2 & delta_h >=0)
+
+# Count trees per site and plot
+tree_counts_wide <- norway_df_healthy %>%
+  group_by(Site) %>%
+  summarise(
+    n_trees = n(),
+    .groups = "drop"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = Site,
+    values_from = n_trees,
+    names_prefix = "Plot_"
+  )
+
+# Only print the kable table
+tree_counts_wide %>%
+  kable(
+    digits = 0,
+    booktabs = TRUE,
+    caption = "Number of healthy trees per Plot"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+ggplot(norway_df_healthy, aes(x = factor(Site), y = delta_h, fill = EMF_species)) +
+  geom_boxplot() +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Control"            = "Control",
+      "Fertiliser"         = "Fertiliser"
+    )
+  ) +
+  labs(
+    x = 'Plot',
+    y = 'Change in Height (cm)',
+  )+
+    theme_bw()
+
+ 
+
+
+```
+Norway boxplots for changes in height for healthy trees with zero positive change in height
+NS_1, 2, 3 are cell grown, NS_4, 5, 6 are bare root. 
+Change in height for health 2 trees with change in height of 0 or above
+Change in height is greatest for pellet trees for both cell grown and bare root
+
+```{r eval=FALSE, fig.height=4, fig.pos='H', fig.width=7, warning=FALSE, include=FALSE}
+# BAR CHART FOR MEAN VALUES OF CHANGE IN HEIGHT and table of means
+
+#need to filter the Health_1 == 0 out of these - they are the dead trees, which are 
+#recorded as final height = 0, hence giving negative delta h
+
+# ANd remove all trees with dead tops - which we will take as delta_h < -5
+
+# make a long df
+norway_df_healthy <- norway_df %>%  filter(Health_1 == 2 & delta_h >= 0)
+
+summary_df <- norway_df_healthy %>%
+  group_by(Site,EMF_species) %>%  # group by site, plot, and treatment
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# PDF-safe table
+summary_df %>%
+  kable(
+    digits = 2,
+    booktabs = TRUE,
+    caption = "Mean change in height"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+
+ggplot(summary_df, aes(x = factor(Site), y = mean_delta_h, fill = EMF_species)) +
+  geom_col(position = position_dodge(width = 0.8)) +       # bar chart
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h,
+                    ymax = mean_delta_h + se_delta_h),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Control"            = "Control",
+      "Fertiliser"         = "Fertiliser"
+    ))+
+    labs(
+    x = 'Plot',
+    y = 'Mean change in Height (cm)',
+  )+
+      theme_bw()
+```
+Norway mean change in height for healthy trees, health 2 and change in height > 0
+NS_1, 2, 3 are cell grown, NS_4, 5, 6 are bare root. 
+Change in height is greatest for pelleted trees for both cell grown and bare root seedlings. 
+
+
+```{r eval=FALSE, fig.height=4, fig.pos='H', fig.width=7, warning=FALSE, include=FALSE}
+# change in height relative to control
+
+norway_df_healthy <- norway_df %>% filter(Health_1 == 2 & delta_h >= 0)
+
+summary_df <- norway_df_healthy %>%
+  group_by(Site, EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+norway_df_means <- norway_df_healthy %>%
+  mutate(
+    Block = case_when(
+    Site == 'NS_1'  ~ 1,
+    Site == 'NS_2'  ~ 2,
+    Site == 'NS_3'  ~ 3,
+    Site == 'NS_4'  ~ 4,
+    Site == 'NS_5'  ~ 5,
+    Site == 'NS_6'  ~ 6,
+    )
+  )
+
+summary_block <- norway_df_means %>%
+  group_by(Site, Block, EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    .groups = "drop"
+  )
+# Controls only
+control_blocks <- summary_block %>%
+  filter(EMF_species == "Control") %>%
+  select(Block, mean_delta_h) %>%
+  rename(control_block = Block,
+         control_mean = mean_delta_h)
+
+summary_treatment <- summary_block %>%
+  filter(EMF_species != "Control") %>%  # only Fertiliser and Pellet
+  mutate(control_block = case_when(
+    Block %in% c(2,3) ~ 1,   # Blocks 2 and 3 use Block 1 as reference
+    Block %in% c(5,6) ~ 4    # Blocks 5 and 6 use Block 4 as reference
+  ))
+
+summary_diff <- summary_treatment %>%
+  left_join(control_blocks, by = c("control_block")) %>%
+  mutate(delta_vs_control = mean_delta_h - control_mean) %>%
+  select(Block, control_block, EMF_species, mean_delta_h, control_mean, delta_vs_control)
+
+
+ggplot(summary_diff, aes(x = factor(Block), y = delta_vs_control, fill = EMF_species)) +
+  geom_col(position = position_dodge(width = 0.5)) +
+    scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",  # Pellet
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Fertiliser"         = "Fertiliser"
+    )
+  ) +
+  labs(
+    x = "Reference Control Plot (Block)",
+    y = "Mean change in height relative to Control (cm)",
+    fill = "Treatment"
+  ) +
+  theme_bw()
+
+
+
+
+```
+Norway Mean change in height relative to control for healthy trees. 2, 3 are cell grown, 5, 6 are bare root. Bars show the difference in the mean change in height across the plots for the cell grown and the bare root Norway spruce compared to control trees. The pelleted trees show the greatest change in height compared to control.
+
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+# box and bar plot for overal mean delta_h - ignoring tree type 0 bare root/cell etc.
+#do the overall site change as well
+
+norway_df_healthy <- norway_df %>% filter(Health_1 == 2 & delta_h >= 0)
+
+
+
+p1 = ggplot(norway_df_healthy, aes(x = EMF_species, y = delta_h, fill = EMF_species)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") + # optional: show mean
+  scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    )
+  ) +
+  labs(
+    x = "Treatment",
+    y = "Change in height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    text = element_text(size = 12)
+  )
+
+
+
+# 1️⃣ Summarise mean and SE by treatment
+norway_summary <- norway_df_healthy %>%
+  group_by(EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# 2️⃣ Bar plot with SE and mean values inside
+p2 = ggplot(norway_summary, aes(x = EMF_species, y = mean_delta_h, fill = EMF_species)) +
+  geom_col(width = 0.7) +
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h, 
+                    ymax = mean_delta_h + se_delta_h),
+                width = 0.2) +
+  geom_text(aes(label = round(mean_delta_h, 2)),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4) +
+  scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    )
+  ) +
+  labs(
+    x = "Treatment",
+    y = "Mean change in height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    text = element_text(size = 12)
+  )
+p1 / p2
+```
+
+Norway change in height across site when we combine the two different seedling types, i.e cell and bare root.In all plots Pelleted trees showed the greatest change in height.
+
+\newpage
+
+PINE CHANGES IN HEIGHT
+
+
+
+```{r eval=FALSE, fig.height=4, fig.pos='H', fig.width=7, warning=FALSE, include=FALSE}
+
+#PLOT OF PINE START HEIGHTS
+ggplot(pine_df, aes(x = factor(Site), y = Height_0)) +
+  geom_boxplot() +
+  labs(x = "Site", y = "Starting height (cm)") +
+  theme_bw()
+
+
+
+```
+Pine start heights, as with Norway, 1,2,3 = cell  - control, fertilized, pellet. 4,5,6 = bare root - control fertilized, pellet. 
+The cell grown trees are all smaller on planting than the bare roots. The pelleted trees are about the same start height as the control and fertilizer groups.
+
+```{r eval=FALSE, fig.height=4, fig.pos='H', fig.width=7, warning=FALSE, include=FALSE}
+# BOX PLOT FOR CHANGE IN HEIGHTS OF norway - FILTERED BY HEALTH == 2
+#need to filter the Health_1 == 0 out of these - they are the dead trees, which are 
+#recorded as final height = 0, hence giving negative delta h
+
+# ANd remove all trees with dead tops - which we will take as delta_h < 0
+
+# make a long df with only health 2 and delta h > -2
+pine_df_healthy <- pine_df %>% filter(Health_1 == 2 & delta_h >= 0)
+
+# Count trees per site and plot
+tree_counts_wide <- pine_df_healthy %>%
+  group_by(Site) %>%
+  summarise(
+    n_trees = n(),
+    .groups = "drop"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = Site,
+    values_from = n_trees,
+    names_prefix = "Plot_"
+  )
+
+# Only print the kable table
+tree_counts_wide %>%
+  kable(
+    digits = 0,
+    booktabs = TRUE,
+    caption = "Number of healthy trees per Plot"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+ggplot(pine_df_healthy, aes(x = factor(Site), y = delta_h, fill = EMF_species)) +
+  geom_boxplot() +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Control"            = "Control",
+      "Fertiliser"         = "Fertiliser"
+    )
+  ) +
+  labs(
+    x = 'Plot',
+    y = 'Change in Height (cm)',
+  )+
+    theme_bw()
+
+ 
+```
+
+Pine_1, 2, 3 are cell grown, Pine_4, 5, 6 are bare root. 
+This is change in height for health 2 trees with change in height of -1 or above.
+Change in height was greatest for pelleted trees for both cell and bare root. Fertilized bare root trees did not show much growth, but from tree numbers we can see there was a lot of damage in this plot. 
+
+```{r eval=FALSE, fig.height=4, fig.pos='H', fig.width=7, warning=FALSE, include=FALSE}
+# BAR CHART FOR MEAN VALUES OF CHANGE IN HEIGHT
+#need to filter the Health_1 == 0 out of these - they are the dead trees, which are 
+#recorded as final height = 0, hence giving negative delta h
+
+# ANd remove all trees with dead tops - which we will take as delta_h < -5
+
+# make a long df
+pine_df_healthy <-pine_df %>%  filter(Health_1 == 2 & delta_h >= 0)
+
+summary_df <- pine_df_healthy %>%
+  group_by(Site,EMF_species) %>%  # group by site, plot, and treatment
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# PDF-safe table
+summary_df %>%
+  kable(
+    digits = 2,
+    booktabs = TRUE,
+    caption = "Mean change in height"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+
+ggplot(summary_df, aes(x = factor(Site), y = mean_delta_h, fill = EMF_species)) +
+  geom_col(position = position_dodge(width = 0.8)) +       # bar chart
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h,
+                    ymax = mean_delta_h + se_delta_h),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Control"            = "Control",
+      "Fertiliser"         = "Fertiliser"
+    ))+
+    labs(
+    x = 'Plot',
+    y = ' Mean change in Height (cm)',
+  )+
+      theme_bw()
+```
+Pine mean change in height for healthy trees
+1, 2, 3 are cell grown, 4, 5, 6 are bare root. 
+
+Mean change in height is greatest for pelleted trees for both cell are bare root seedlings
+
+
+
+```{r eval=FALSE, fig.height=4, fig.pos='H', fig.width=7, warning=FALSE, include=FALSE}
+# change in height relative to control
+
+pine_df_healthy <- pine_df %>% filter(Health_1 == 2 & delta_h >= 0)
+
+summary_df <- pine_df_healthy %>%
+  group_by(Site, EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+pine_df_means <- pine_df_healthy %>%
+  mutate(
+    Block = case_when(
+    Site == 'Pine_1'  ~ 1,
+    Site == 'Pine_2'  ~ 2,
+    Site == 'Pine_3'  ~ 3,
+    Site == 'Pine_4'  ~ 4,
+    Site == 'Pine_5'  ~ 5,
+    Site == 'Pine_6'  ~ 6,
+    )
+  )
+
+summary_block <- pine_df_means %>%
+  group_by(Site, Block, EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    .groups = "drop"
+  )
+# Controls only
+control_blocks <- summary_block %>%
+  filter(EMF_species == "Control") %>%
+  select(Block, mean_delta_h) %>%
+  rename(control_block = Block,
+         control_mean = mean_delta_h)
+
+summary_treatment <- summary_block %>%
+  filter(EMF_species != "Control") %>%  # only Fertiliser and Pellet
+  mutate(control_block = case_when(
+    Block %in% c(2,3) ~ 1,   # Blocks 2 and 3 use Block 1 as reference
+    Block %in% c(5,6) ~ 4    # Blocks 5 and 6 use Block 4 as reference
+  ))
+
+summary_diff <- summary_treatment %>%
+  left_join(control_blocks, by = c("control_block")) %>%
+  mutate(delta_vs_control = mean_delta_h - control_mean) %>%
+  select(Block, control_block, EMF_species, mean_delta_h, control_mean, delta_vs_control)
+
+
+ggplot(summary_diff, aes(x = factor(Block), y = delta_vs_control, fill = EMF_species)) +
+  geom_col(position = position_dodge(width = 0.5)) +
+    scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",  # Pellet
+      "Fertiliser"         = "blue"
+    ),
+    labels = c(
+      "Paxillus_involutus" = "Pellet",
+      "Fertiliser"         = "Fertiliser"
+    )
+  ) +
+  labs(
+    x = "Reference Control Plot (Block)",
+    y = "Mean change in height relative to Control",
+    fill = "Treatment"
+  ) +
+  theme_bw()
+
+
+
+
+```
+Pine Mean change in height relative to control. 2, 3 are cell grown, 5, 6 are bare root. Bars show the difference in the mean change in height across the plot for the cell grown and the bare root pine compared to control trees. 
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+# box and bar plot for overal mean delta_h - ignoring tree type 0 bare root/cell etc.
+#do the overall site change as well
+
+pine_df_healthy <-pine_df %>% filter(Health_1 == 2 & delta_h >= 0)
+
+
+
+p1 = ggplot(pine_df_healthy, aes(x = EMF_species, y = delta_h, fill = EMF_species)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") + # optional: show mean
+  scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    )
+  ) +
+  labs(
+    x = "Treatment",
+    y = "Change in height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    text = element_text(size = 12)
+  )
+
+
+
+# 1️⃣ Summarise mean and SE by treatment
+pine_summary <- pine_df_healthy %>%
+  group_by(EMF_species) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# 2️⃣ Bar plot with SE and mean values inside
+p2 = ggplot(pine_summary, aes(x = EMF_species, y = mean_delta_h, fill = EMF_species)) +
+  geom_col(width = 0.7) +
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h, 
+                    ymax = mean_delta_h + se_delta_h),
+                width = 0.2) +
+  geom_text(aes(label = round(mean_delta_h, 2)),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4) +
+  scale_fill_manual(
+    values = c(
+      "Paxillus_involutus" = "forestgreen",
+      "Control"            = "orange",
+      "Fertiliser"         = "blue"
+    )
+  ) +
+  labs(
+    x = "Treatment",
+    y = "Mean change in height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    text = element_text(size = 12)
+  )
+
+p1 / p2
+```
+Pine mean change in height across site - that is - grouping the cell and bare root trees together. Overall, pelleted trees have show the greatest change in height.
+
+
+
+
+\newpage
+ 
+
+MORTALITY
+
+A table shows % dead, unhealthy and healthy by tree species and treatment. Note that we calculate by number of trees recorded at second time point - 100 trees were tagged, but some could not be found. These could be assumed to be dead, but we decided to assume that they might be there but we missed them, hence total number of trees is total healthy+total found dead + total unhealthy, or 100 - missing.  
+
+```{r, echo=FALSE, warning=FALSE}
+
+#creates table of health/dead percentage for all plots tree species
+
+#remove non-matching cols in sitka so all tree species can be added
+sitka_reduced = sitka_df %>% select( "Site" , "Height_0","Height_1","Soil_0","EMF_species","Growth",     "Health_1","delta_h" )
+
+alltreespecies_longdf = rbind(sitka_reduced, norway_df, pine_df)
+
+# Count Health_1 values per Site, including NAs
+health_counts <- alltreespecies_longdf %>%
+  group_by(Site, Health_1) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  # replace NA with "NA" so it shows as a column
+  mutate(Health_1 = ifelse(is.na(Health_1), "NA", as.character(Health_1))) %>%
+  # pivot wider for table format
+  pivot_wider(names_from = Health_1, values_from = n, values_fill = 0) %>%
+  arrange(Site)
+
+health_counts <- health_counts %>%
+  mutate(across(everything(), ~replace(., is.na(.), "NA")))
+
+#put in a plot column so they can be in order
+health_counts <- health_counts %>%
+  mutate(
+    Area = if_else(
+      str_detect(Site, "^Sitka"),
+      as.integer(str_extract(Site, "(?<=Sitka)\\d")),
+      NA_integer_
+    ),
+    Plot = if_else(
+      str_detect(Site, "^Sitka"),
+      as.integer(str_extract(Site, "(?<=Sitka\\d)\\d+")),
+      as.integer(str_extract(Site, "(?<=_)\\d+"))
+    )
+  )
+health_counts <- health_counts %>%
+  # Ensure numeric columns
+  mutate(
+    Area = if_else(str_starts(Site, "Sitka"), as.integer(Area), NA_integer_),
+    Plot = as.integer(Plot),
+    TreeSpecies = case_when(
+      str_starts(Site, "NS")   ~ "Norway",
+      str_starts(Site, "Pine") ~ "Pine",
+      str_starts(Site, "Sitka") ~ "Sitka",
+      TRUE ~ NA_character_
+    )
+  )
+
+health_counts[, 2:4] <- lapply(health_counts[, 2:4], as.numeric)
+
+#############make percentages
+health_counts = health_counts %>% 
+   mutate(
+    total = `0` + `1` + `2` , # removing NA coz making it relative to what is there now
+    dead = (`0`/ total) * 100,
+    unhealthy = (`1` / total) * 100,
+    healthy = (`2` / total) * 100
+  )
+
+#make 3 tables so they're easier to cope with.##################################
+
+###Sitka site 1 and 2
+Sitka_health_table = health_counts %>% filter(TreeSpecies == 'Sitka') %>%
+    mutate(
+    Treatment = case_when(
+      Plot %in% c(4, 7, 10)  ~ "Control",
+      Plot %in% c(5, 8, 11)  ~ "Fertilizer",
+      Plot %in% c(6, 9, 12)  ~ "Pellet",
+      TRUE                  ~ NA_character_
+    )
+   ) %>%
+  mutate(
+Growth = case_when(
+      Plot %in% c(4, 5, 6)  ~ "VPBare",
+      Plot %in% c(7,8,9)  ~ "ImpCell",
+      Plot %in% c(10,11,12)  ~ "Impbare",
+      TRUE                  ~ NA_character_
+    )
+) %>% select(Area,Growth, Treatment, dead, unhealthy, healthy)
+
+Sitka_health_table %>%
+  kable(
+    digits = 0,
+    booktabs = TRUE,
+    caption = "Percentage Health Sitka"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+####now norway############################
+
+Norway_health_table  = health_counts %>% filter(TreeSpecies == 'Norway') %>%
+    mutate(
+    Treatment = case_when(
+      Plot %in% c(1, 4)  ~ "Control",
+      Plot %in% c(2,5)  ~ "Fertilizer",
+      Plot %in% c(3,6)  ~ "Pellet",
+      TRUE                  ~ NA_character_
+    )
+   ) %>% 
+  mutate(
+  Growth = case_when(
+      Plot %in% c(1,2,3)  ~ 'Cell',
+      Plot %in% c(4,5,6)  ~ 'Bare',
+      TRUE                  ~ NA_character_
+    ) )%>%
+  select(Growth, Treatment, dead, unhealthy, healthy)
+
+Norway_health_table %>%
+  kable(
+    digits = 0,
+    booktabs = TRUE,
+    caption = "Percentage Health Norway"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+
+#####Pine ######################
+
+Pine_health_table  = health_counts %>% filter(TreeSpecies == 'Pine') %>%
+    mutate(
+    Treatment = case_when(
+      Plot %in% c(1, 4)  ~ "Control",
+      Plot %in% c(2,5)  ~ "Fertilizer",
+      Plot %in% c(3,6)  ~ "Pellet",
+      TRUE                  ~ NA_character_
+    )
+   ) %>% 
+  mutate(
+  Growth = case_when(
+      Plot %in% c(1,2,3)  ~ 'Cell',
+      Plot %in% c(4,5,6)  ~ 'Bare',
+      TRUE                  ~ NA_character_
+    ) )%>%
+  select(Growth, Treatment, dead, unhealthy, healthy)
+
+Pine_health_table %>%
+  kable(
+    digits = 0,
+    booktabs = TRUE,
+    caption = "Percentage Health Pine"
+  ) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#plots or percent dead healthy etc for sitka only by plot SITKA SITE 1
+#create the table again
+sitka_reduced = sitka_df %>% select( "Site" , "Height_0","Height_1","Soil_0","EMF_species","Growth",     "Health_1","delta_h" )
+
+alltreespecies_longdf = rbind(sitka_reduced, norway_df, pine_df)
+
+# Count Health_1 values per Site, including NAs
+health_counts <- alltreespecies_longdf %>%
+  group_by(Site, Health_1) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  # replace NA with "NA" so it shows as a column
+  mutate(Health_1 = ifelse(is.na(Health_1), "NA", as.character(Health_1))) %>%
+  # pivot wider for table format
+  pivot_wider(names_from = Health_1, values_from = n, values_fill = 0) %>%
+  arrange(Site)
+
+health_counts <- health_counts %>%
+  mutate(across(everything(), ~replace(., is.na(.), "NA")))
+
+#put in a plot column so they can be in order
+health_counts <- health_counts %>%
+  mutate(
+    Area = if_else(
+      str_detect(Site, "^Sitka"),
+      as.integer(str_extract(Site, "(?<=Sitka)\\d")),
+      NA_integer_
+    ),
+    Plot = if_else(
+      str_detect(Site, "^Sitka"),
+      as.integer(str_extract(Site, "(?<=Sitka\\d)\\d+")),
+      as.integer(str_extract(Site, "(?<=_)\\d+"))
+    )
+  )
+health_counts <- health_counts %>%
+  # Ensure numeric columns
+  mutate(
+    Area = if_else(str_starts(Site, "Sitka"), as.integer(Area), NA_integer_),
+    Plot = as.integer(Plot),
+    TreeSpecies = case_when(
+      str_starts(Site, "NS")   ~ "Norway",
+      str_starts(Site, "Pine") ~ "Pine",
+      str_starts(Site, "Sitka") ~ "Sitka",
+      TRUE ~ NA_character_
+    )
+  )
+
+health_counts[, 2:4] <- lapply(health_counts[, 2:4], as.numeric)
+
+#############make percentages
+health_counts = health_counts %>% 
+   mutate(
+    total = `0` + `1` + `2` , # removing NA coz making it relative to what is there now
+    dead = (`0`/ total) * 100,
+    unhealthy = (`1` / total) * 100,
+    healthy = (`2` / total) * 100
+  )
+
+
+
+health_counts_table <- health_counts %>%
+  # Ensure numeric columns
+  mutate(
+    Area = if_else(str_starts(Site, "Sitka"), as.integer(Area), NA_integer_),
+    Plot = as.integer(Plot),
+    TreeSpecies = case_when(
+      str_starts(Site, "NS")   ~ "Norway",
+      str_starts(Site, "Pine") ~ "Pine",
+      str_starts(Site, "Sitka") ~ "Sitka",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  # Arrange hierarchically: species, area, plot
+  arrange(TreeSpecies, Area, Plot) %>% select(Area, Plot, TreeSpecies, dead, unhealthy, healthy)
+
+#filter the sitka
+health_sitka = health_counts_table %>% filter(TreeSpecies == 'Sitka')
+
+
+
+#add treatment column
+
+health_sitka = health_sitka %>%
+   mutate(
+    Treatment = case_when(
+      Plot %in% c(4, 7, 10)  ~ "Control",
+      Plot %in% c(5, 8, 11)  ~ "Fertilizer",
+      Plot %in% c(6, 9, 12)  ~ "Pellet",
+      TRUE                  ~ NA_character_
+    )
+   ) %>%
+  mutate(
+Growth = case_when(
+      Plot %in% c(4, 5, 6)  ~ "VPBare",
+      Plot %in% c(7,8,9)  ~ "ImpCell",
+      Plot %in% c(10,11,12)  ~ "Impbare",
+      TRUE                  ~ NA_character_
+    )
+)
+
+
+#pivot longer for health
+health_sitka_long = health_sitka %>%
+  pivot_longer(
+    cols = c(dead, unhealthy, healthy),
+    names_to = "Health",
+    values_to = "count"
+  ) 
+
+health_sitka_long <- health_sitka_long %>%
+  mutate(
+    Area = factor(Area),
+    Plot = factor(Plot),
+    Treatment = factor(Treatment,
+                       levels = c("Control", "Fertilizer", "Pellet")),
+    Health = factor(Health,
+                    levels = c("dead", "unhealthy", "healthy"))
+  )
+#site 1, healthy
+df_area1_health1<- health_sitka_long %>%
+  filter(Area == 1, Health == 'healthy')
+
+
+p1 = ggplot(df_area1_health1, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+  labs(
+    title = 'HEALTH_2',
+    x = "Treatment",
+    y = "Count"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",   # remove legend if redundant
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  ) 
+#site 1, unhealthy
+df_area1_health1<- health_sitka_long %>%
+  filter(Area == 1, Health == 'unhealthy')
+
+
+p2 = ggplot(df_area1_health1, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+  labs(
+    title = 'HEALTH_1',
+    x = "Treatment",
+    y = "Count"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",   # remove legend if redundant
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  ) 
+
+#site 1, dead
+df_area1_health1<- health_sitka_long %>%
+  filter(Area == 1, Health == 'dead')
+
+
+p3 = ggplot(df_area1_health1, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+  labs(
+    title = 'HEALTH_0',
+    x = "Treatment",
+    y = "Count"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",   # remove legend if redundant
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  ) 
+p1/p2/p3
+
+```
+The Box plots show the percentage of trees in each health category at Site 1 for Sitka.The first row is healthy trees, the second unhealthy and the bottom row are percentage dead (mortality)
+
+4,5,6 = VP BARE, 7,8,9 IMP CELL, 10,11,12 = IMP BARE. I, 2 are sites 1 and 2
+This is Health_0 + Health_1/ Total number of found trees - i.e. not counting the trees where tags had been lost.
+The fertilized or control plots always have the highest mortality, with pelleted plots either lowest or intermediate. 
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#plots or percent dead healthy etc for sitka only by plot SITKA SITE 2
+#create the table again
+sitka_reduced = sitka_df %>% select( "Site" , "Height_0","Height_1","Soil_0","EMF_species","Growth",     "Health_1","delta_h" )
+
+alltreespecies_longdf = rbind(sitka_reduced, norway_df, pine_df)
+
+# Count Health_1 values per Site, including NAs
+health_counts <- alltreespecies_longdf %>%
+  group_by(Site, Health_1) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  # replace NA with "NA" so it shows as a column
+  mutate(Health_1 = ifelse(is.na(Health_1), "NA", as.character(Health_1))) %>%
+  # pivot wider for table format
+  pivot_wider(names_from = Health_1, values_from = n, values_fill = 0) %>%
+  arrange(Site)
+
+health_counts <- health_counts %>%
+  mutate(across(everything(), ~replace(., is.na(.), "NA")))
+
+#put in a plot column so they can be in order
+health_counts <- health_counts %>%
+  mutate(
+    Area = if_else(
+      str_detect(Site, "^Sitka"),
+      as.integer(str_extract(Site, "(?<=Sitka)\\d")),
+      NA_integer_
+    ),
+    Plot = if_else(
+      str_detect(Site, "^Sitka"),
+      as.integer(str_extract(Site, "(?<=Sitka\\d)\\d+")),
+      as.integer(str_extract(Site, "(?<=_)\\d+"))
+    )
+  )
+health_counts <- health_counts %>%
+  # Ensure numeric columns
+  mutate(
+    Area = if_else(str_starts(Site, "Sitka"), as.integer(Area), NA_integer_),
+    Plot = as.integer(Plot),
+    TreeSpecies = case_when(
+      str_starts(Site, "NS")   ~ "Norway",
+      str_starts(Site, "Pine") ~ "Pine",
+      str_starts(Site, "Sitka") ~ "Sitka",
+      TRUE ~ NA_character_
+    )
+  )
+
+health_counts[, 2:4] <- lapply(health_counts[, 2:4], as.numeric)
+
+#############make percentages
+health_counts = health_counts %>% 
+   mutate(
+    total = `0` + `1` + `2` , # removing NA coz making it relative to what is there now
+    dead = (`0`/ total) * 100,
+    unhealthy = (`1` / total) * 100,
+    healthy = (`2` / total) * 100
+  )
+
+
+
+health_counts_table <- health_counts %>%
+  # Ensure numeric columns
+  mutate(
+    Area = if_else(str_starts(Site, "Sitka"), as.integer(Area), NA_integer_),
+    Plot = as.integer(Plot),
+    TreeSpecies = case_when(
+      str_starts(Site, "NS")   ~ "Norway",
+      str_starts(Site, "Pine") ~ "Pine",
+      str_starts(Site, "Sitka") ~ "Sitka",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  # Arrange hierarchically: species, area, plot
+  arrange(TreeSpecies, Area, Plot) %>% select(Area, Plot, TreeSpecies, dead, unhealthy, healthy)
+
+#filter the sitka
+health_sitka = health_counts_table %>% filter(TreeSpecies == 'Sitka')
+
+
+
+#add treatment column
+
+health_sitka = health_sitka %>%
+   mutate(
+    Treatment = case_when(
+      Plot %in% c(4, 7, 10)  ~ "Control",
+      Plot %in% c(5, 8, 11)  ~ "Fertilizer",
+      Plot %in% c(6, 9, 12)  ~ "Pellet",
+      TRUE                  ~ NA_character_
+    )
+   ) %>%
+  mutate(
+Growth = case_when(
+      Plot %in% c(4, 5, 6)  ~ "VPBare",
+      Plot %in% c(7,8,9)  ~ "ImpCell",
+      Plot %in% c(10,11,12)  ~ "Impbare",
+      TRUE                  ~ NA_character_
+    )
+)
+
+
+#pivot longer for health
+health_sitka_long = health_sitka %>%
+  pivot_longer(
+    cols = c(dead, unhealthy, healthy),
+    names_to = "Health",
+    values_to = "count"
+  ) 
+
+health_sitka_long <- health_sitka_long %>%
+  mutate(
+    Area = factor(Area),
+    Plot = factor(Plot),
+    Treatment = factor(Treatment,
+                       levels = c("Control", "Fertilizer", "Pellet")),
+    Health = factor(Health,
+                    levels = c("dead", "unhealthy", "healthy"))
+  )
+#site 1, healthy
+df_area1_health1<- health_sitka_long %>%
+  filter(Area == 2, Health == 'healthy')
+
+
+p1 = ggplot(df_area1_health1, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+  labs(
+    title = 'HEALTH_0',
+    x = "Treatment",
+    y = "Percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",   # remove legend if redundant
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  ) 
+#site 1, unhealthy
+df_area1_health1<- health_sitka_long %>%
+  filter(Area == 2, Health == 'unhealthy')
+
+
+p2 = ggplot(df_area1_health1, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+  labs(
+    title =  'HEALTH_1',
+    x = "Treatment",
+    y = "Percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",   # remove legend if redundant
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  ) 
+
+#site 1, dead
+df_area1_health1<- health_sitka_long %>%
+  filter(Area == 2, Health == 'dead')
+
+
+p3 = ggplot(df_area1_health1, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+  labs(
+    title = 'HEALTH_0',
+    x = "Treatment",
+    y = "percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",   # remove legend if redundant
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  ) 
+p1/p2/p3
+
+```
+
+The Box plots show the percentage of trees in each health category at Site 2 for Sitka.The first row is healthy trees, the second unhealthy and the bottom row are percentage dead (mortality)
+
+4,5,6 = VP BARE, 7,8,9 IMP CELL, 10,11,12 = IMP BARE. I, 2 are sites 1 and 2
+This is Health_0 + Health_1/ Total number of found trees - i.e. not counting the trees where tags had been lost.
+The fertilized or control plots always have the highest mortality, with pelleted plots either lowest or intermediate. 
+
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+
+
+#SITKA MORTALITY FOR EACH PLOT, AND OVERALL ACROSS SITE
+#remove non-matching cols in sitka so all tree species can be added
+sitka_reduced = sitka_df %>% select( "Site" , "Height_0","Height_1","Soil_0","EMF_species","Growth",     "Health_1","delta_h" )
+
+#actually - only do sitka here in the end - dont need this really, but leaving it for now as I reselect
+#sitka from here below!
+alltreespecies_longdf = rbind(sitka_reduced, norway_df, pine_df)
+
+# Count Health_1 values per Site, including NAs - 
+# THIS IS A COUNT OF THE 0,1,2'S IN THE HEALTH_1 COLUMN
+health_counts <- alltreespecies_longdf %>%
+  group_by(Site, Health_1) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  # replace NA with "NA" so it shows as a column
+  mutate(Health_1 = ifelse(is.na(Health_1), "NA", as.character(Health_1))) %>%
+  # pivot wider for table format
+  pivot_wider(names_from = Health_1, values_from = n, values_fill = 0) %>%
+  arrange(Site)
+#rename the columns because the 0,1 colnames are tricky
+colnames(health_counts)[colnames(health_counts) == '0'] <- 'Health_0'
+colnames(health_counts)[colnames(health_counts) == '1'] <- 'Health_1'
+colnames(health_counts)[colnames(health_counts) == '2'] <- 'Health_2'
+
+health_counts_new <- health_counts %>%
+  mutate(
+    Tree_species = case_when(
+      grepl("^NS", Site)   ~ "Norway",
+      grepl("^Pine", Site) ~ "Pine",
+      grepl("^Sitka", Site) ~ "Sitka",
+      TRUE ~ NA_character_  # fallback if none match
+    )  )
+
+#split out the sitka because there are so many it be difficult to see plots
+
+sitka_health = health_counts_new %>% filter(Tree_species == 'Sitka')
+#and put a plot column in
+sitka_health <- sitka_health %>%
+  mutate(
+    Area = as.integer(str_extract(Site, "(?<=Sitka)\\d")),       # 1 or 2
+    Plot = as.integer(str_extract(Site, "(?<=Sitka\\d)\\d+")), # digits after Area
+    Health_0 = as.numeric(Health_0),
+    Health_1 =  as.numeric(Health_1),
+    Health_2 = as.numeric(Health_2)
+      )
+
+sitka_health = sitka_health %>%
+  mutate(
+    mortality = (Health_0/(Health_0+Health_1+Health_2))*100,
+    unhealthy = (Health_1/(Health_0+Health_1+Health_2))*100,
+  )
+
+# Convert to long format for stacking
+sitka_long <- sitka_health %>%
+  pivot_longer(
+    cols = c(mortality, unhealthy),
+    names_to = "Status",
+    values_to = "count"
+  ) %>%
+  mutate(count = as.numeric(count)) %>%
+  mutate(
+    count = as.numeric(count),
+    Treatment = case_when(
+      Plot %in% c(4,7,10)  ~ "Control",
+      Plot %in% c(5,8,11)  ~ "Fertiliser",
+      Plot %in% c(6,9,12)  ~ "Pellet",
+      TRUE ~ NA_character_
+    ),
+    # pattern column as factor for legend
+    Pattern = factor(ifelse(Status == "mortality", "mortality", "unhealthy"),
+                     levels = c("mortality", "unhealthy"))
+  )
+ #get mortality by site 1 and 2
+mortality_area = sitka_long %>%
+  group_by(Area, Treatment) %>%
+  summarise(
+    dead  = sum(Health_0, na.rm = TRUE),
+    total = sum(Health_0 + Health_1 + Health_2, na.rm = TRUE),
+    mortality_pct = dead / total * 100,
+    .groups = "drop"
+  )
+
+
+#this one just for sitka across the whole site
+mortality_treatment <- sitka_long %>%
+  group_by(Treatment) %>%
+  summarise(
+    dead  = sum(Health_0, na.rm = TRUE),
+    total = sum(Health_0 + Health_1 + Health_2, na.rm = TRUE),
+    mortality_pct = dead / total * 100,
+    .groups = "drop"
+  )
+
+
+#3, ignore the different plots - VP, IMP etc, what is sitka mortality at each site
+p1=ggplot(mortality_area,
+       aes(x = Treatment, y = mortality_pct, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Area) +
+  geom_text(aes(label = paste0(round(mortality_pct, 1), "%")),
+            position = position_stack(vjust = 0.5),  # center inside the bar
+            color = "white",
+            size = 4) +
+  labs(
+    x = "Treatment",
+    y = "Mortality (%)"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Control" = "orange",
+      "Fertiliser" = "blue",
+      "Pellet" = "forestgreen"
+    )
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+#4 Ignore the different sites, Sitka mortality across the whole planting
+
+p2 = ggplot(mortality_treatment,
+       aes(x = Treatment, y = mortality_pct, fill = Treatment)) +
+  geom_col(width = 0.7) +
+    geom_text(aes(label = paste0(round(mortality_pct, 1), "%")),
+            position = position_stack(vjust = 0.5),  # center inside the bar
+            color = "white",
+            size = 4) +
+  labs(
+    x = "Treatment",
+    y = "Mortality (%)"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Control" = "orange",
+      "Fertiliser" = "blue",
+      "Pellet" = "forestgreen"
+    )
+  ) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+p1 / p2
+```
+
+Sitka mortality, the first plot shows mortality across site 1 and 2 separately, the second chart is for all plots combined across the site. 
+
+When we ignore plot types, pelleted trees always have the lowest mortality, although it os only very slightly lower than that of control. The fertilized trees generally show the highest mortality for Sitka at this site
+\newpage
+
+NORWAY MORTALITY
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#NORWAY MORTALITY
+
+noway_health_counts <-   norway_df %>%
+  group_by(Site, Health_1) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  # replace NA with "NA" so it shows as a column
+  mutate(Health_1 = ifelse(is.na(Health_1), "NA", as.character(Health_1))) %>%
+  # pivot wider for table format
+  pivot_wider(names_from = Health_1, values_from = n, values_fill = 0) %>%
+  arrange(Site)
+#rename the columns because the 0,1 colnames are tricky
+colnames(noway_health_counts)[colnames(noway_health_counts) == '0'] <- 'Health_0'
+colnames(noway_health_counts)[colnames(noway_health_counts) == '1'] <- 'Health_1'
+colnames(noway_health_counts)[colnames(noway_health_counts) == '2'] <- 'Health_2'
+
+
+noway_health_counts = noway_health_counts %>%
+  mutate(
+    dead = (Health_0/(Health_0+Health_1+Health_2))*100,
+    unhealthy = (Health_1/(Health_0+Health_1+Health_2))*100,
+    healthy = (Health_2/(Health_0+Health_1+Health_2))*100,
+  ) %>%
+ mutate(
+    Site_num = as.integer(sub(".*_", "", Site)),
+    Growth = case_when(
+      Site_num %in% 1:3 ~ "Cell",
+      Site_num %in% 4:6 ~ "Bare"
+    ),
+    
+    Treatment = case_when(
+      Site_num %in% c(1, 4) ~ "Control",
+      Site_num %in% c(2, 5) ~ "Fertilizer",
+      Site_num %in% c(3, 6) ~ "Pellet"
+    )
+  ) %>% select (Growth, Treatment, dead, unhealthy, healthy)
+  
+#pivot to plot
+df_long <- noway_health_counts %>%
+  pivot_longer(
+    cols = c(dead, unhealthy, healthy),
+    names_to = "Status",
+    values_to = "count"
+  )
+
+#healthy##############
+
+healthy = df_long %>% filter(Status == 'healthy')
+
+p1 = ggplot(healthy, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7, position = "identity") +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+    labs(
+    title = 'HEALTH_2',
+    x = "Treatment",
+    y = "Percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+#uhealthy##############
+
+uhealthy = df_long %>% filter(Status == 'unhealthy')
+
+p2 = ggplot(uhealthy, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7, position = "identity") +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+      labs(
+    title = 'HEALTH_1',
+    x = "Treatment",
+    y = "Percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+#dead##############
+
+dead = df_long %>% filter(Status == 'dead')
+
+p3 = ggplot(dead, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7, position = "identity") +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+  labs(
+    title = 'HEALTH_0',
+    x = "Treatment",
+    y = "Percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+p1/p2/p3
+
+```
+
+Norway health by treatment. Values are percentage of measured trees. 
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#PINE MORTALITY ON ITS OWN
+
+pine_health_counts <-   pine_df %>%
+  group_by(Site, Health_1) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  # replace NA with "NA" so it shows as a column
+  mutate(Health_1 = ifelse(is.na(Health_1), "NA", as.character(Health_1))) %>%
+  # pivot wider for table format
+  pivot_wider(names_from = Health_1, values_from = n, values_fill = 0) %>%
+  arrange(Site)
+#rename the columns because the 0,1 colnames are tricky
+colnames(pine_health_counts)[colnames(pine_health_counts) == '0'] <- 'Health_0'
+colnames(pine_health_counts)[colnames(pine_health_counts) == '1'] <- 'Health_1'
+colnames(pine_health_counts)[colnames(pine_health_counts) == '2'] <- 'Health_2'
+
+
+pine_health_counts = pine_health_counts %>%
+  mutate(
+    dead = (Health_0/(Health_0+Health_1+Health_2))*100,
+    unhealthy = (Health_1/(Health_0+Health_1+Health_2))*100,
+    healthy = (Health_2/(Health_0+Health_1+Health_2))*100,
+  ) %>%
+ mutate(
+    Site_num = as.integer(sub(".*_", "", Site)),
+    Growth = case_when(
+      Site_num %in% 1:3 ~ "Cell",
+      Site_num %in% 4:6 ~ "Bare"
+    ),
+    
+    Treatment = case_when(
+      Site_num %in% c(1, 4) ~ "Control",
+      Site_num %in% c(2, 5) ~ "Fertilizer",
+      Site_num %in% c(3, 6) ~ "Pellet"
+    )
+  ) %>% select (Growth, Treatment, dead, unhealthy, healthy)
+  
+#pivot to plot
+df_long <- pine_health_counts %>%
+  pivot_longer(
+    cols = c(dead, unhealthy, healthy),
+    names_to = "Status",
+    values_to = "count"
+  )
+
+#healthy##############
+
+healthy = df_long %>% filter(Status == 'healthy')
+
+p1 = ggplot(healthy, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7, position = "identity") +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+    labs(
+    title = 'HEALTH_2',
+    x = "Treatment",
+    y = "Percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+#uhealthy##############
+
+uhealthy = df_long %>% filter(Status == 'unhealthy')
+
+p2 = ggplot(uhealthy, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7, position = "identity") +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+      labs(
+    title = 'HEALTH_1',
+    x = "Treatment",
+    y = "Percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+#dead##############
+
+dead = df_long %>% filter(Status == 'dead')
+
+p3 = ggplot(dead, aes(x = Treatment, y = count, fill = Treatment)) +
+  geom_col(width = 0.7, position = "identity") +
+  facet_wrap(~ Growth) +
+  scale_fill_manual(
+    values = c(
+      Control    = "orange",
+      Fertilizer = "blue",
+      Pellet     = "forestgreen"
+    )
+  ) +
+  labs(
+    title = 'HEALTH_0',
+    x = "Treatment",
+    y = "Percentage"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+p1/p2/p3
+
+```
+
+Norway health by treatment. Values are percentage of measured trees. 
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#lets ignore plots and do sum of mortality at site level, norway and pine together
+#this one for site 1 and 2
+long_df = rbind(norway_df, pine_df)
+
+health_counts <-   long_df %>%
+  group_by(Site, Health_1) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  # replace NA with "NA" so it shows as a column
+  mutate(Health_1 = ifelse(is.na(Health_1), "NA", as.character(Health_1))) %>%
+  # pivot wider for table format
+  pivot_wider(names_from = Health_1, values_from = n, values_fill = 0) %>%
+  arrange(Site)
+#rename the columns because the 0,1 colnames are tricky
+colnames(health_counts)[colnames(health_counts) == '0'] <- 'Health_0'
+colnames(health_counts)[colnames(health_counts) == '1'] <- 'Health_1'
+colnames(health_counts)[colnames(health_counts) == '2'] <- 'Health_2'
+
+health_counts_new <- health_counts %>%
+  mutate(
+    Tree_species = case_when(
+      grepl("^NS", Site)   ~ "Norway",
+      grepl("^Pine", Site) ~ "Pine",
+            TRUE ~ NA_character_  # fallback if none match
+    )  )
+
+
+tree_health = health_counts_new %>%
+  mutate(
+    mortality = (Health_0/(Health_0+Health_1+Health_2))*100,
+    unhealthy = (Health_1/(Health_0+Health_1+Health_2))*100,
+  )
+
+# Define colors
+treatment_colors <- c(
+  "Control" = "orange",
+  "Fertiliser" = "blue",
+  "Pellet" = "forestgreen"
+)
+
+
+##############
+
+#and put a plot column in
+tree_health <- tree_health %>%
+  separate(Site, into = c("Tree_species", "Plot"), sep = "_") %>%
+  mutate(Plot = as.integer(Plot))
+
+# Convert to long format for stacking
+health_long <- tree_health %>%
+  pivot_longer(
+    cols = c(mortality, unhealthy),
+    names_to = "Status",
+    values_to = "count"
+  ) %>%
+  mutate(count = as.numeric(count)) %>%
+  mutate(
+    count = as.numeric(count),
+    Treatment = case_when(
+      Plot %in% c(1,4)  ~ "Control",
+      Plot %in% c(2,5)  ~ "Fertiliser",
+      Plot %in% c(3,6)  ~ "Pellet",
+      TRUE ~ NA_character_
+    ),
+    # pattern column as factor for legend
+    Pattern = factor(ifelse(Status == "mortality", "mortality", "unhealthy"),
+                     levels = c("mortality", "unhealthy"))
+  )
+
+
+mortality_species <- health_long %>%
+  group_by(Tree_species, Treatment) %>%
+  summarise(
+    dead  = sum(Health_0, na.rm = TRUE),
+    total = sum(Health_0 + Health_1 + Health_2, na.rm = TRUE),
+    mortality_pct = dead / total * 100,
+    .groups = "drop"
+  )
+
+#2 ignore the different plots - VP, IMP etc, what is  mortality at each site
+p2 = ggplot(mortality_species,
+       aes(x = Treatment, y = mortality_pct, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Tree_species) +
+  geom_text(aes(label = paste0(round(mortality_pct, 1), "%")),
+            position = position_stack(vjust = 0.5),  # center inside the bar
+            color = "white",
+            size = 4) +
+  labs(
+    x = "Treatment",
+    y = "Mortality (%)"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Control" = "orange",
+      "Fertiliser" = "blue",
+      "Pellet" = "forestgreen"
+    )
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+p2
+
+```
+Norway and pine mortality at site level - ignoring the sapling types. For both tree species the pelleted trees have the lowest mortality. The mortality for pine is high for all treatment types due to weevil damage. 
+
+\newpage
+CORREALTIONS WITH PLANTING SOIL
+The site was a highly disturbed clear fell soil which had been mounded. The trenches were very deep such that sub soil was exposed. Some mounds had been created which were peat blocks, and some trees were planted into these. In other cases piles of rock were drawn together and saplings placed into the rock. Alternatively the sapling was placed into sub soil. The different starting conditions were numbered from 1-4. Note that in some cases soil or sub soil had been placed onto of brash piles with voids below. We omitted trees planted in these circumstances as we felt that the soil would very quickly fall through the brash leaving the tree effectively exposed and un-planted. Recording the height of some of the trees was difficult as in some cases they were buried completely in rock or subsoil with only a cm or 2 exposed. In this case, and in order to have 100 trees within the allocated areas we lifted the trees and replaced it firmly into the same locaiton but with more of the tree above ground. 
+
+```{r, echo=FALSE, warning=FALSE, fig.height=9, fig.width=7, fig.pos='H'}
+# go to start df and combine
+#SITKA MORTALITY FOR EACH PLOT, AND OVERALL ACROSS SITE
+#remove non-matching cols in sitka so all tree species can be added, vp imp etc
+sitka_reduced = sitka_df %>% select( "Site" , "Height_0","Height_1","Soil_0","EMF_species","Growth",     "Health_1","delta_h" )
+
+#actually - only do sitka here in the end - dont need this really, but leaving it for now as I reselect
+#sitka from here below!
+alltreespecies_longdf = rbind(sitka_reduced, norway_df, pine_df)
+
+alltreespecies_longdf <- alltreespecies_longdf %>%
+  mutate(Soil_0 = factor(Soil_0))
+
+alltreespecies_longdf = alltreespecies_longdf %>%
+ mutate(Tree_species = case_when(
+    str_detect(Site, "^Sitka") ~ "Sitka",
+    str_detect(Site, "^Pine")  ~ "Pine",
+    str_detect(Site, "^NS")    ~ "Norway",
+    TRUE ~ NA_character_       # fallback for unexpected values
+  ))
+#Look at ration of dead to alive in each soil type - ration of health_0/Health_2
+
+# Summarise counts per Soil_0
+death_rate <- alltreespecies_longdf %>%
+  group_by(Tree_species, Soil_0) %>%
+  summarise(
+    Total = sum(!is.na(Health_1)),               # count of trees with measured health
+    Dead = sum(Health_1 == 0, na.rm = TRUE),    # number of dead trees
+    DeathRate = Dead / Total                     # proportion dead
+  ) %>%
+  ungroup()
+
+death_rate
+
+
+```
+The table shows death rate of trees overall, ignoring species or treatments. That is dead/number of trees - by soil group. I would have expected a higher death rate for soil type 3 and 4 - shale and rock piles, compared to 1 and 2 - which were closer to a soil. But bearing in mind that this also includes trees planted into a peat block. These blocks can dry out very quickly and might not  re-wet. We Would have to go back and re-examine the dead trees in soil type 1 to see if we can understand this. But I think the unbalanced nature of the data here makes analysis of this factor difficult and not worth pursuing
+
+DISCUSSION
+
+Overall across the site, the treated Sitka had greater change in height than control, but fertilized trees had on average the greatest change in height when considering the entire site. There were within site differences with some plots in which fertilized trees grew the least well, showing less change in height than control plots, and other plots where the pelleted trees had the greatest change. This is likely due to micro-climatic differences, differences on planting, or emf species deployed. We cannot isolate these differences because micro-climate variables are not measured and the specific application of the different emf species was not tracked at planting. This is also an issue with the plot layout - since we have only 1 plot per treatment we cannot carry out any modelling which would allow us to look for effect sizes of different factors. An experimental set up to isolate and analyse more of these factors would have been very difficult to deploy because of the large number of treatments - requiring many more replicate plots and randomization. It would still be also possible that correlations change in height or mortality between specific factors would be missed if those factors were not measured.  At this site the customer was interested in the differences between bare root and cell grown trees with 4 treatments, which would require a minimum of 3 blocks of 12 plots each - 36 plots. In each of those we would not record other specific variables such as soil N or moisture, so whilst we could estimate the effect size for treatments (pellet, control, fert) and type (vp cell, vp bare etc), we would likely still see a large amount of variability which would be unexplained.
+
+For Norway and pine more straightforward patterns of increased growth compared to fertilizer over control were clear across all plots. Although the pine suffered high weevil damage in one area. Mortality is also lower for pelleted plots compared to controls for these 2 species. 
+
+Overall, ignoring within plot and within site differences, mortality is lower in pelleted sitka plots, but there are a couple of exceptions to this at the within plot level, with VP bare root trees at site 1 and Imp bare root trees at site 2 showing higher mortality in pelleted plots than control plots. 
+
+One unexpected result here is the increased mortality across several tree species and plot types for the fertilized plots. Sitka showed increased mortality at site 1 and 2 overall in fertilized plots. This was very varied, and the general picture is dominated by big within site differences. VP  bare root trees at both sites suffer high mortality for fertilized plots. Similarly, Norway bare root showed high mortality. With the high variability in this result it seems likely that this is due to a confounding effect of an unrecorded factor such as drought rather than being due to the fertilizer itself. 
+
+GOING FORWARD.    
+
+Although it might be nice to continue to monitor the Norway and perhaps a couple of Sitka plots, since we dont know what the fungal species is, we probably wont carry on with this site. Potentially we could carry out some soil eDNA measurements to see if we can detect the inoculum, but combined with the suboptimal site set up, which limits the information we can get from the site, I would recommend we drop this site.
+
+
+

@@ -698,7 +698,7 @@ g3 = ggplot(month15, aes(x = height, fill = treatment)) +
 #legend = ggplotGrob(g3)$grobs[[which(sapply(ggplotGrob(g3)$grobs, function(x) x$name) == "guide-box")]]
 
 #plot the hisotgrams for the other time points
-#library(gridExtra)
+library(gridExtra)
 grid.arrange(g1,g2,g3,legend, ncol = 1)
 
 ###############################################
@@ -728,7 +728,7 @@ ggplot(group_means_adj, aes(x = time, y = Mean_Height_Adjusted, color = treatmen
   geom_point(size = 4) +  # Plot points
   geom_line(size = 1) +   # Connect the points with a line
   scale_color_manual(values = c("Control" = "orange", "Fertiliser" = 'blue', "Pellet" = "darkgreen")) + # Custom colors for treatments
-  labs(title = '', x = "Time(months)", y = "Adjusted Mean Height(cm)") +
+  labs(title = '', x = "Time(months)", y = "Change in height increment(cm)") +
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 18),

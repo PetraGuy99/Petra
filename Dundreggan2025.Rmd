@@ -1,0 +1,44 @@
+---
+title: "Dundreggan2025"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r, message=T, warning=F}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggpubr)
+library(ggplot2)
+
+setwd('C:/dev/code/Petra')
+knitr::opts_chunk$set(
+  echo = F,      # hide all code by default
+  message = FALSE,   # hide package messages
+  warning = FALSE    # hide warnings
+)
+```
+
+Dundreggan has been measured at 4 time points, August 2023, April 2024, November 2024 and October 2025
+Initially tree tags were lost and there was no tree_id between years. Different numbers of trees 
+were recorded each year. In April 2024 we made some attempt to tag trees with numbered tags start to follow exact tree growth rates. 
+
+This first quick exploration just uses plot averages - that is - we ignore growth rates between trees and only look at change in average plot height of all trees. 
+
+```{r}
+#read in the data
+# Path to your Excel file of just height data over all 4 time points
+file_path <- "../../data/field/Dundreggan2025.xlsx"
+
+# Get all sheet names - eahc sheet is a different plot, site 1 fert, site 1 pellet etc
+sheet_names <- excel_sheets(file_path)
+
+# Read all sheets into a named list of data frames
+dfs <- lapply(sheet_names, function(sheet) read_excel(file_path, sheet = sheet))
+names(dfs) <- sheet_names
+
+```
+
+

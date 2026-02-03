@@ -1,0 +1,82 @@
+---
+title: "Biodiversity Metrics"
+output: html_notebook
+---
+
+This notebook is to explore ways to create a biodiversity metric - specifically.
+Specifically, looking at using GBIF. Here I will query GBIF and download some data
+then see if there is anything in it that might be useful, e.g. can we create 'rare'
+species lists by area?
+
+First, could try loading Functional Traits, and then extracting all Classes of interest
+For example, we dont need to look at species names of fungi that are pathogens of nematodes
+
+```{r}
+#load libraries and set directory
+setwd('C:/dev/code/Petra')
+
+library(dplyr)
+library(rgbif)
+library(purrr)
+```
+I have looked at the classes for wood, soil, litter and dung sapro and ect and
+deleted some that I think are not requried - single celled or algae sapros etc.
+These will need to be checked
+
+```{r}
+#filter out useful primary lifestyles
+
+selected_classes = c('Agaricomycetes','Cystobasidiomycetes','Dacrymycetes', 'Dothideomycetes','Eurotiomycetes', 
+  'Geoglossomycetes','Mortierellomycetes',
+  'Pezizomycetes','Saccharomycetes',
+  'Sordariomycetes','Tremellomycetes')
+```
+
+```{r}
+
+
+# Get GBIF taxon keys for these fungal classes
+class_keys <- map_chr(selected_classes, ~ as.character(name_backbone(.x, rank = "class")$usageKey))
+
+years = as.character(2000:2025)
+
+# Build predicates for the GBIF download
+
+preds <- pred_and(
+  pred_in("taxonKey", class_keys),          # multiple keys works automatically
+  pred("country", "GB"),                 # equality
+  pred("basisOfRecord", "HUMAN_OBSERVATION"),
+  pred("occurrenceStatus", "PRESENT"),
+  pred_in("year", years),              # use ">" operators as extra argument
+  pred_notnull("decimalLatitude"),               # automatically checks not null
+  pred_notnull("decimalLongitude")
+)
+
+```
+
+
+```{r}
+#downlaod the data
+
+options(gbif_user = "pguy", gbif_email = "petra.guy.uk@gmail.com", gbif_pwd = "a6khyNNU3PnSspx")
+
+res <- occ_download(preds)
+
+# Wait for the download to be ready
+occ_download_wait(res)
+
+# Import the download
+fungal_data <- occ_download_get(res) %>% occ_download_import()
+
+```
+
+I now want to extract data from GBIF for fungi, in the above classes with additional filters:Occurrence status : present, Basis of record: Human observation, 
+Location: Including coordinates, year, 2000 - 2025, 
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

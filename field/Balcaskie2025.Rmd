@@ -1,0 +1,753 @@
+---
+title: "Balcaskie Monitoring 2025"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  library(ggpubr)
+  library(ggplot2)
+  library(nlme)
+  library(kableExtra)
+  library(stringr)
+  library(ggpattern) 
+  library(patchwork)
+  library(lme4)
+  library(lmerTest)
+  library(broom.mixed)
+  library(emmeans)
+  library(purrr)
+  library(car)
+  library(MASS)
+})
+
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#read raw data
+data = read_excel('../../../data/field/Balcaskie2025.xlsx')
+
+sheets <- excel_sheets('../../../data/field/Balcaskie2025.xlsx')  # get sheet names
+
+# read all sheets into a named list, suppressing the New names messages
+all_sheets <- suppressMessages(
+  lapply(sheets, function(s) {
+    read_excel('../../../data/field/Balcaskie2025.xlsx', sheet = s)
+  })
+)
+names(all_sheets) <- sheets
+
+# remove meta
+all_sheets <- all_sheets[-c(1,5,6)]
+
+#remove the hornbeam and the hazel, there werent enough of these in the end
+all_sheets <- map(all_sheets, ~ .x %>%
+                    filter(!Tree_Species %in% c('Carpinus_betulus', 'Betula_pendula','Corylus_avellana')))
+
+#add the delta_h in now
+all_sheets <- map(all_sheets, ~ .x %>%
+                    mutate(
+                      delta_h   = Height_1 - Height_0,
+                      delta_rcd = Rcd_mm_1 - Rcd_mm_0
+                    ))
+                   
+
+selected_cols <- all_sheets_long <- map(all_sheets, ~ .x %>%
+                         dplyr::select(Tree_Species, Health_1, delta_h, delta_rcd)) 
+
+
+#make long df
+df_long <- bind_rows(
+  selected_cols,
+  .id = "Plot"
+)
+
+#add a treatment column
+
+
+df_long <- df_long %>%
+  mutate(
+    Treatment = case_when(
+      str_detect(Plot, "_treat$") ~ "Pellet",   # ends with "treat"
+      str_detect(Plot, "Control") ~ "Control",
+      TRUE ~ NA_character_                       # anything else
+    )
+  )
+
+```
+INTERNAL DOCUMENT ONLY
+
+SUMMARY
+Average change in height for oak was 44% compared to control. To test significance data was transformed using 0.25 power transformation to improve normality and homogeneity of variance. Analysis of transformed data showed change in height due to pellet not significant (p = 0.1, ANOVA).
+
+OR...Change in (median) height of oak due to pellet was modeled to be 19% greater than untreated trees, (there is 95% probability that this value lies in the interval 9.5% - 74%) with an 89% probability that the effect is positive. (Moderate support for positive effect if we round to 90%!)
+
+OR...The result above is modeled on the data with all zeros removed (for log transform) but - I would argue that these zeros hold information which is then lost. If we include the zeros in the model - by making them 0.1, we get...Change in (median) height of oak due to pellet was modeled to be 40% greater compared to untreated trees with 97% probability that the effect is positive. There is 95% probability that this effect lies within the interval 0.3% to 96%
+
+INTRODUCTION
+Balcaskie is ex-ag site which was split into two areas by customer, one area was control, the other half of the field was treated. Two emf were supplied, but we dont know what went where. MBR planting, but only trees in sufficient number to be retained for analysis were beech and oak.
+
+TREATMENTS
+Pellet and control
+
+METHODS
+heights and rcd taken in autumn 2024 and again autumn 2025
+
+ANALYSIS
+Because there are no repeats/randomization - so arguable we should do plot averages - but we will  consider trees as independent. Data is tree-tree mean change in height for ~ 12 months. We will explore mean change in heights per plot and test for significance using ANOVA. We will also model change in height using Bayesian GLM. 
+
+Have not bothered with Fagus as exploration showed little/no effect.
+
+ALso not done rcd as decided to move on. Can come back to that later
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#explore data - what do -ve heights look like etc and how many trees per plot etc.
+
+p1 = ggplot(df_long, aes(x = factor(Health_1), y = delta_h)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # color & fill
+   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # horizontal line at 0
+  labs(
+    x = "Health class",
+    y = "Change in height (cm)",
+   ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12)
+  )
+
+
+ 
+p1
+```
+
+Data check, negative delta_h for health_0 and health_1 trees as expected - some health_2 trees as well though - these will be removed from the data for change in height.
+
+The table below summarizes the number of trees with positive delta_h which will be used in change in height plots, delta h >= 0. There are roughly equal numbers of oak and beech in the control and treatment areas after -ves removed. 
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+# look at numbers or trees per treatment etc when negative heights removed
+
+df_long_positive = df_long %>% filter(delta_h >= 0)
+
+
+# Summarise counts
+df_summary_counts <- df_long_positive %>%
+  group_by(Tree_Species, Treatment, Health_1) %>%
+  summarise(n_trees = n(), .groups = "drop")
+
+# Pivot so Treatments become columns
+df_summary_table <- df_summary_counts %>%
+  pivot_wider(
+    names_from = Treatment,
+    values_from = n_trees,
+    values_fill = 0  # fill missing combinations with 0
+  )
+
+# Display nicely
+df_summary_table %>%
+  kable(
+    caption = "Number of trees in each treatment by health class",
+    col.names = c("Tree Species", "Health", "n(Control)", "n(Pellet)"),
+    align = c("c", "c", "c", "c")
+  ) %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+df_long_positive = df_long %>% filter(delta_h >= 0)
+
+df_summary_delta_h <- df_long_positive %>%
+  group_by(Tree_Species, Treatment) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    n            = n(),
+    .groups = "drop"
+  )
+# Display nicely
+df_summary_delta_h %>%
+  kable(
+    caption = "Mean change in heights (cm)",
+    col.names = c("Tree Species", "Treatment", "mean_delta_h", "se","n"),
+    align = c("c", "c", "c", "c")
+  ) %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+Tables below show summary of number of trees per plot and mean values when we omit the zeros, i.e delta h > 0 - this is the data subset used for the ANOVA and GLM.Note this shifts the mean up a bit and we have lost 5 trees from control and 1 from pellet. Possibly these losses could influence the data since there are more in control than in pellet. If these were brought back in at say 0.1, then ln(0.1) = -2.3, there are 5 of these in control and only 1 in pellet - hence the mean for control would be reduce more than than that of pellet. Even if we used ln(1) = 0  could have an impact? Since the zero change in heights do represent a physical difference between the plots - more had 0 change in control than pellet
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+# look at numbers or trees per treatment etc when negative heights removed
+#ALSO LOOK AT NUMBERS OF TREES AND MEANS FOR THOSE STRICTLY POSITIVE - COZ THATS WHAT WE 
+#USE IN THE MODELS LATER
+
+df_long_abovezero = df_long %>% filter(delta_h > 0)
+
+
+# Summarise counts
+df_summary_counts <- df_long_abovezero %>%
+  group_by(Tree_Species, Treatment, Health_1) %>%
+  summarise(n_trees = n(), .groups = "drop")
+
+# Pivot so Treatments become columns
+df_summary_table <- df_summary_counts %>%
+  pivot_wider(
+    names_from = Treatment,
+    values_from = n_trees,
+    values_fill = 0  # fill missing combinations with 0
+  )
+
+# Display nicely
+df_summary_table %>%
+  kable(
+    caption = "Number of trees in each treatment by health class",
+    col.names = c("Tree Species", "Health", "n(Control)", "n(Pellet)"),
+    align = c("c", "c", "c", "c")
+  ) %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+
+# summarya data for the positive only
+
+df_long_abovezero = df_long %>% filter(delta_h > 0)
+
+df_summary_delta_h <- df_long_abovezero %>%
+  group_by(Tree_Species, Treatment) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    n            = n(),
+    .groups = "drop"
+  )
+# Display nicely
+df_summary_delta_h %>%
+  kable(
+    caption = "Mean change in heights (cm)",
+    col.names = c("Tree Species", "Treatment", "mean_delta_h", "se","n"),
+    align = c("c", "c", "c", "c")
+  ) %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+
+#box plots and bar plots of change in height - includes the zeros
+
+p1 = ggplot(df_long_positive, aes(x = Treatment, y = delta_h, fill = Treatment)) +
+  geom_boxplot(width = 0.7, outlier.shape = 21, color = "black") +
+  facet_wrap(~ Tree_Species, scales = "free_y") +  # one facet per species
+  scale_fill_manual(values = c(Control = "orange", Pellet = "forestgreen" )) +
+  labs(
+    title = "Distribution of delta_h by Treatment and Tree Species",
+    x = "Treatment",
+    y = "Change in Height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+
+# summarya data for the positive only
+
+df_long_abovezero = df_long %>% filter(delta_h > 0)
+
+df_summary_delta_h <- df_long_abovezero %>%
+  group_by(Tree_Species, Treatment) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    n            = n(),
+    .groups = "drop"
+  )
+
+p2 = ggplot(df_summary_delta_h, aes(x = Treatment, y = mean_delta_h, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h, ymax = mean_delta_h + se_delta_h),
+                width = 0.3, color = "black") +
+  facet_wrap(~ Tree_Species, scales = "free_y") +
+  scale_fill_manual(values = c(
+    Control = "orange",
+    Pellet  = "forestgreen"
+  )) +
+  labs(
+    title = "Mean delta_h  SE by Treatment and Tree Species",
+    x = "Treatment",
+    y = "Mean Change in Height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p1/p2
+```
+
+The charts show the distribution of mean change in height, and bar plot for mean value with se - we can see from se that the change for oak is possibly significant? (PS, this data includes the 0 change in heights)
+
+
+
+First table shows shapiro wilk on un-transformed delta_h. Second shows Levine test of homogeneity of variance. Showing we need transformation
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+##look at ANOVE, but check data first for normality and homog
+
+quercus =  df_long_positive %>% filter( Tree_Species == 'Quercus_robur')
+fagus =  df_long_positive %>% filter(Tree_Species =='Fagus_sylvatics')
+
+quercus %>%   #ps looking for large p means normal
+  group_by(Treatment) %>%
+  summarise(
+    shapiro_p = shapiro.test(delta_h)$p.value
+  )
+
+var.test(delta_h ~ Treatment, data = quercus) # looking for large p var is homog
+
+ggplot(quercus, aes(sample = delta_h)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ Treatment)
+
+
+```
+
+QQplots for untransformed data showing show lack of normality. Data is not Normal and heteroskedastic, since its +ve only change in height - this is expected. Log transform was tried, but data still showed signs of non-normality
+
+Box-cox suggest transfom of x^0.25. The first table shows the shapiro wilk for normality on the transformed data, the second is the test for homog of variances. Plots are qqplots of transformed data. Finally - summary(anova) for delta_h^0.25.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+##look at ANOVA, but check data first for normality and homog
+
+#log transform tried but still not normal
+df_long_positive = df_long %>% filter(delta_h >= 0)
+
+quercus =  df_long_positive %>% filter( Tree_Species == 'Quercus_robur')
+fagus =  df_long_positive %>% filter(Tree_Species =='Fagus_sylvatics')
+
+#remove 0s
+quercus_nozero = quercus %>% filter(delta_h >0)
+quercus_nozero$loght =  log(quercus_nozero$delta_h)
+
+#quercus_nozero %>%   #ps looking for large p means normal
+ # group_by(Treatment) %>%
+  #summarise(
+    #shapiro_p = shapiro.test(loght)$p.value
+ # )
+
+#var.test(loght ~ Treatment, data = quercus_nozero) # looking for large p var is homog
+
+#ggplot(quercus_nozero, aes(sample = loght)) +
+  #stat_qq() +
+  #stat_qq_line() +
+  #facet_wrap(~ Treatment)
+
+#still not normal - use MASS library and Boc-Cox to hunt for best transformation
+
+#boxcox(lm(delta_h ~Treatment, data = quercus_nozero)) #the graph
+#lm_mod <- lm(delta_h ~ Treatment, data = quercus_nozero) #run model to get actual values
+#bc <- boxcox(lm_mod, lambda = seq(-2, 2, 0.1), plotit = FALSE) # view the actual values
+
+#boxcox suggests 0.25 ish - try 0.25?
+
+quercus_nozero <- quercus_nozero %>%
+  mutate(root = delta_h^0.25)
+
+quercus_nozero %>%   #ps looking for large p means normal
+  group_by(Treatment) %>%
+  summarise(
+    shapiro_p = shapiro.test(root)$p.value
+  )
+
+var.test(loght ~ Treatment, data = quercus_nozero) # looking for large p var is homog
+
+ggplot(quercus_nozero, aes(sample = root)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ Treatment)
+
+#ttest data
+control = quercus_nozero %>% filter(Treatment == 'Control') %>% dplyr::select(root)
+pellet = quercus_nozero %>% filter(Treatment == 'Pellet') %>% dplyr::select(root)
+
+#ho means are equal
+anova = aov(root ~ Treatment, data = quercus_nozero)
+summary(anova)
+```
+
+To meet the assumptions of parametric testing, the change in height was transformed using a Box-Cox power of 0.25. After transformation, residuals were approximately normal (Shapiro–Wilk test: Control, W = 0.297; Treatment, W = 0.475) and homogeneity of variances between treatments was acceptable (F-test, p = 0.0516). ANOVA was performed on the transformed values to assess treatment effects.  Anova suggests data not significant at p = 0.1.
+
+Next tying Bayes GLM. Not expecting different results, but going forward this might be a neater and more understandable approach. because CI and % change are more in-line with the messages we want to give, rather than the weird interpretation of p value etc...
+
+The posterior distribution indicated a median 19% increase in change in height under pellet treatment relative to control, with a P = 0.80 probability that the effect was positive. The median 19% increase represents the median of the posterior distribution of percentage differences between pellet and control predictions, obtained by back-transforming posterior samples from the lognormal model. Only positive changes in height were modeled.
+
+Note that these data may be considered unsuitable for these types of models as we have two separate plots (control - Treatment) - this model assumes Independence across trees. (PS we do not need constant variance, balance or normality). That is - it could be said that we have 2 data points - treatment average and control average. 
+
+
+```{r, echo=FALSE, warning=FALSE,message = FALSE, results = 'hide',fig.height=4, fig.width=7, fig.pos='H'}
+#redo Bayesian -  with non-transformed data
+
+suppressMessages({
+  library(brms)
+  library(tibble)
+})
+
+df_long_positive = df_long %>% filter(delta_h >= 0)
+#get oak
+quercus =  df_long_positive %>% filter( Tree_Species == 'Quercus_robur')
+
+#remoce zeros
+quercus_nozero = quercus %>% filter(delta_h >0)
+
+
+#posterior means and crdibilty intevals
+m <- brm(
+  delta_h ~ Treatment,
+  data = quercus_nozero,
+  family = lognormal(),
+  refresh = 0,          # suppress chain progress
+  silent = TRUE         # suppress Stan messages
+)
+
+#this extracts the effect size for the pellet (i.e, intercept+pellet effect)
+#since this is lognormal, actual effect size is exp(intercept+pellet)
+summary = posterior_summary(m, probs = c(0.025, 0.975))
+
+#need to back transform because used a log-normal
+#b_intercept is the basline or control, b_Treatment is difference in log(delta_h) due to pellet
+
+
+
+#  Extract posterior samples- this gives a df of effect sizes based on the distribution
+#for the effect sizes from the model
+post <- posterior_samples(m)
+n <- nrow(post)
+
+#get the control (intercept) effect, and transform back from lognormal
+control_vals <- exp(post$b_Intercept) 
+median_control <- median(control_vals)
+ci_control <- quantile(control_vals, probs = c(0.025, 0.975))
+
+pellet_vals <- exp(post$b_Intercept + post$b_TreatmentPellet)
+median_pellet <- median(pellet_vals)
+ci_pellet <- quantile(pellet_vals, probs = c(0.025, 0.975))
+
+pct_change <- (pellet_vals / control_vals - 1) * 100
+median_pct <- median(pct_change)
+ci_pct <- quantile(pct_change, c(0.025, 0.975))
+
+
+
+summary_table <- tibble(
+  Parameter = c("Control (Intercept)", "Pellet", "Pellet % change"),
+  Median = c(median_control, median_pellet, median_pct),
+  CI_lower = c(ci_control[1], ci_pellet[1], ci_pct[1]),
+  CI_upper = c(ci_control[2], ci_pellet[2], ci_pct[2])
+)
+
+print(summary_table)
+
+#lets get a probability of positive change
+#this gives the number of TRUE for mean of treatment effect is > 0
+prob_positive = mean(post$b_TreatmentPellet >0)
+
+###############################################################################
+#MODEL VALIDATION - JUST LOOKING AT RESIDUALS VERUS ACTUAL AND PLOT OF ACTUAL MEAN VERSUS
+#THE MODELLED MEANS
+
+#this looks at fitting method - need rhat = 1
+#print(m)
+
+
+#rediduals versus fitted
+# Posterior predicted values (median for each observation)
+y_pred <- apply(posterior_predict(m), 2, median)
+
+# Observed values
+y_obs <- quercus_nozero$delta_h
+
+# Residuals
+resid <- y_obs - y_pred
+
+# Basic residuals vs predicted plot
+plot(y_pred, resid,
+     xlab = "Predicted change in height (median posterior)",
+     ylab = "Residuals",
+     main = "Residuals vs Predicted for Quercus Model",
+     pch = 16, col = "steelblue")
+abline(h = 0, col = "red", lty = 2)
+
+#look at model predictions for mean of control and mean of treatment
+# Simulate posterior predictions, from each start vlaue of delta he, predict
+#on the model geneates a set of new delta ha's
+y_rep <- posterior_predict(m)  # matrix: draws x observations
+
+# Indices for each treatment
+ctrl_idx <- which(quercus_nozero$Treatment == "Control")
+pellet_idx <- which(quercus_nozero$Treatment == "Pellet")
+
+# Compute mean per draw for each group of simulations
+mean_ctrl <- apply(y_rep[, ctrl_idx], 1, mean)
+mean_pellet <- apply(y_rep[, pellet_idx], 1, mean)
+
+# Observed means
+obs_mean_ctrl <- mean(quercus_nozero$delta_h[ctrl_idx])
+obs_mean_pellet <- mean(quercus_nozero$delta_h[pellet_idx])
+
+# Plot
+hist(mean_ctrl, breaks = 30, col = rgb(0,0,1,0.3), main="Posterior predictive means", xlab=" change in height")
+abline(v = obs_mean_ctrl, col = "blue", lwd = 2)
+hist(mean_pellet, breaks = 30, col = rgb(1,0,0,0.3), add = TRUE)
+abline(v = obs_mean_pellet, col = "red", lwd = 2)
+legend("topright", legend=c("Control","Pellet"), col=c("blue","red"), lwd=2)
+
+```
+
+Note that I am not totally sure how to validate these models. I dont think it matters much with the simple model here, because the data is very straight forward. I show a residuals vs fitted, showing 2 clouds - around the 2 means for pellet and treatment - which looks ok? Second I show the actual mean (solid line) with the histogram of predicted model means. Since the actual mean falls within the high density area of the histogram, I think the model is reasonably sensible.
+
+The first table (number) below is the proportion of positive posterior draws on the Treatment change in height, showing the probability of a positive effect - ideally this would be  100%, 90% implies moderate support for positive effect, 80-90% implies weak support.
+
+ The table shows the posterior median effect and 95% credibility intervals for the pellet applied to oak modeled using a Bayesian linear GLM with lognormal transform to response (delta h per tree). 
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+prob_positive = mean(post$b_TreatmentPellet >0)
+
+prob_positive
+
+summary_table
+```
+
+This second bit of analysis is sensitivity analysis for including the zero values - by adding 0.1 to every delta_h.
+\newpage
+
+```{r, echo=FALSE, warning=FALSE,message = FALSE, results = 'hide',fig.height=4, fig.width=7, fig.pos='H'}
+#redo Bayesian -  with non-transformed data
+#BUT  REPEAT - AND INSTEAD OF DELETING THE ZEROS - USE delta_h >0, and then add 0.1
+
+suppressMessages({
+  library(brms)
+  library(tibble)
+})
+
+df_long_positive = df_long %>% filter(delta_h >= 0)
+#get oak
+quercus =  df_long_positive %>% filter( Tree_Species == 'Quercus_robur')
+
+#dont remove zeros - add.0.1
+quercus_nozero = quercus %>% mutate(
+  delta_h_pos = delta_h + 0.1
+)
+
+
+#posterior means and crdibilty intevals
+m <- brm(
+  delta_h_pos ~ Treatment,
+  data = quercus_nozero,
+  family = lognormal(),
+  refresh = 0,          # suppress chain progress
+  silent = TRUE         # suppress Stan messages
+)
+
+#this extracts the effect size for the pellet (i.e, intercept+pellet effect)
+#since this is lognormal, actual effect size is exp(intercept+pellet)
+summary = posterior_summary(m, probs = c(0.025, 0.975))
+
+#need to back transform because used a log-normal
+#b_intercept is the basline or control, b_Treatment is difference in log(delta_h) due to pellet
+
+
+
+#  Extract posterior samples- this gives a df of effect sizes based on the distribution
+#for the effect sizes from the model
+post <- posterior_samples(m)
+n <- nrow(post)
+
+#get the control (intercept) effect, and transform back from lognormal
+control_vals <- exp(post$b_Intercept) 
+median_control <- median(control_vals)
+ci_control <- quantile(control_vals, probs = c(0.025, 0.975))
+
+pellet_vals <- exp(post$b_Intercept + post$b_TreatmentPellet)
+median_pellet <- median(pellet_vals)
+ci_pellet <- quantile(pellet_vals, probs = c(0.025, 0.975))
+
+pct_change <- (pellet_vals / control_vals - 1) * 100
+median_pct <- median(pct_change)
+ci_pct <- quantile(pct_change, c(0.025, 0.975))
+
+
+
+summary_table <- tibble(
+  Parameter = c("Control (Intercept)", "Pellet", "Pellet % change"),
+  Median = c(median_control, median_pellet, median_pct),
+  CI_lower = c(ci_control[1], ci_pellet[1], ci_pct[1]),
+  CI_upper = c(ci_control[2], ci_pellet[2], ci_pct[2])
+)
+
+print(summary_table)
+
+#lets get a probability of positive change
+#this gives the number of TRUE for mean of treatment effect is > 0
+prob_positive = mean(post$b_TreatmentPellet >0)
+
+###############################################################################
+#MODEL VALIDATION - JUST LOOKING AT RESIDUALS VERUS ACTUAL AND PLOT OF ACTUAL MEAN VERSUS
+#THE MODELLED MEANS
+
+#this looks at fitting method - need rhat = 1
+#print(m)
+
+
+#rediduals versus fitted
+# Posterior predicted values (median for each observation)
+y_pred <- apply(posterior_predict(m), 2, median)
+
+# Observed values
+y_obs <- quercus_nozero$delta_h
+
+# Residuals
+resid <- y_obs - y_pred
+
+# Basic residuals vs predicted plot
+plot(y_pred, resid,
+     xlab = "Predicted change in height (median posterior)",
+     ylab = "Residuals",
+     main = "Residuals vs Predicted for Quercus Model",
+     pch = 16, col = "steelblue")
+abline(h = 0, col = "red", lty = 2)
+
+#look at model predictions for mean of control and mean of treatment
+# Simulate posterior predictions, from each start vlaue of delta he, predict
+#on the model geneates a set of new delta ha's
+y_rep <- posterior_predict(m)  # matrix: draws x observations
+
+# Indices for each treatment
+ctrl_idx <- which(quercus_nozero$Treatment == "Control")
+pellet_idx <- which(quercus_nozero$Treatment == "Pellet")
+
+# Compute mean per draw for each group of simulations
+mean_ctrl <- apply(y_rep[, ctrl_idx], 1, mean)
+mean_pellet <- apply(y_rep[, pellet_idx], 1, mean)
+
+# Observed means
+obs_mean_ctrl <- mean(quercus_nozero$delta_h[ctrl_idx])
+obs_mean_pellet <- mean(quercus_nozero$delta_h[pellet_idx])
+
+# Plot
+hist(mean_ctrl, breaks = 30, col = rgb(0,0,1,0.3), main="Posterior predictive means", xlab="change in height")
+abline(v = obs_mean_ctrl, col = "blue", lwd = 2)
+hist(mean_pellet, breaks = 30, col = rgb(1,0,0,0.3), add = TRUE)
+abline(v = obs_mean_pellet, col = "red", lwd = 2)
+legend("topright", legend=c("Control","Pellet"), col=c("blue","red"), lwd=2)
+
+```
+
+The validation plot showing the modeled means and the actual mean seem to suggest that the control raw mean is closer to being outside the bulk of the values of the histogram, compared to when zeros were omitted.
+
+The first table/number below is the proportion of positive posterior draws on the Treatment change in height, WHEN WE INCLUDE THE ZEROS but adjust them by 0.1 so that we can log
+
+The summary table shows the model predicted medians, back transformed from lognormal, with 95% credibility intervals
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+prob_positive = mean(post$b_TreatmentPellet >0)
+
+prob_positive
+
+summary_table
+```
+The posterior distribution now indicates a median 40% increase in change in height under pellet treatment relative to control, with a P = 0.97 probability that the effect was positive. 
+
+Are we getting good result now because we arbitrarily choose 0s to add .1, but what about the -1, -1.5, where do we draw the line. We chose to ignore all -ve - but we know we have ~1cm error, we have measured that.  Lets look at distribution of -ve values first, then do some sensitivity analysis.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#box plots of delta h in different health groups as reality check for the oak
+#are we leaving lots of of control when actually if we took the -1 and added 1 to thise, we would get a different story.
+
+#leave out the health 0 as we know they are all -ve
+df_neg <- df_long %>%
+  filter(Tree_Species == "Quercus_robur",
+         Health_1 >0,
+         delta_h <= 0)
+
+# Quick histogram of negative delta_h values
+p1 = ggplot(df_neg, aes(x = delta_h)) +
+  geom_histogram(binwidth = 1, fill = "firebrick", color = "black") +
+  scale_x_continuous(breaks = seq(floor(min(df_neg$delta_h)),
+                                  ceiling(max(df_neg$delta_h)), by = 1)) +
+  labs(title = "Distribution of negative delta_h values for Quercus",
+       subtitle = "Health_1 =1 or 2",
+       x = "delta_h (cm) (negative values only)",
+       y = "Count") +
+  theme_minimal()
+#overlapping bars for control and treatment
+ggplot(df_neg, aes(x = delta_h, fill = Treatment)) +
+  geom_histogram(binwidth = 1, color = "black",
+                 position = position_dodge(width = 1), alpha = 0.8) +
+  scale_x_continuous(breaks = seq(floor(min(df_neg$delta_h)),
+                                  ceiling(max(df_neg$delta_h)), by = 1)) +
+  scale_fill_manual(values = c("Control" = "blue", "Pellet" = "red")) +
+  labs(title = "Distribution of negative delta height values for Quercus",
+       subtitle = "Health_1 = 1 or 2",
+       x = "change in height (cm) (negative values only)",
+       y = "Count",
+       fill = "Treatment") +
+  theme_minimal()
+
+#cumulative totals
+
+# Define bins in the order you want
+bins <- 0:-5  # 0, -1, -2, ..., -5
+
+# Compute counts and cumulative counts per Treatment
+df_cum <- df_neg %>%
+  group_by(Treatment) %>%
+  summarise(count = table(factor(delta_h, levels = bins))) %>%
+  tidyr::unnest(cols = c(count)) %>%
+  group_by(Treatment) %>%
+  mutate(
+    bin = bins,
+    cum_count = cumsum(count)
+  ) %>%
+  ungroup()
+
+p2 = ggplot(df_cum, aes(x = bin, y = cum_count, color = Treatment)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = bins) +
+  scale_color_manual(values = c("Control" = "blue", "Pellet" = "red")) +
+  labs(
+    title = "Cumulative frequency of negative delta h for Quercus",
+    subtitle = "Health_1 = 1 or 2",
+    x = "change in height (cm) threshold",
+    y = "Cumulative count",
+    color = "Treatment"
+  ) +
+  theme_minimal()
+
+
+
+p1 /p2
+
+```
+
+The cf chart shows that if we leave out 0s, we omit 5 control trees and 1 treatment tree. If we omit anything below -2, we omit 6 control trees and 3 treatment trees., -3, 6 control and 4 treatment.
+
+These data points do carry information - they are most likely to be trees for which change in height was unmeasurably small. That is a result and by omitting them completely we lose that data. But where do we cut off. i) If add back in more -ve control than treatment trees this is in our favour. ii) If we include all trees to -5 we have approximately similar number omitted , but is -5 too much and we are including browsed trees. iii) We have carried out error checks which suggest 1cm is potential error - giving justifiable reason to include -1s. 

@@ -1,0 +1,461 @@
+---
+title: "TilhillOlivia2025"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  #library(ggpubr)
+  library(ggplot2)
+  #library(nlme)
+  library(kableExtra)
+  library(stringr)
+  library(ggpattern) 
+  library(patchwork)
+  #library(lme4)
+  #library(lmerTest)
+ # library(broom.mixed)
+  #library(emmeans)
+  library(purrr)
+  #library(car)
+  #library(MASS)
+})
+
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#read raw data
+data = read_excel('../../../data/field/TilhillOlivia2025.xlsx')
+
+sheets <- excel_sheets('../../../data/field/TilhillOlivia2025.xlsx')  # get sheet names
+
+# read all sheets into a named list, suppressing the New names messages
+all_sheets <- suppressMessages(
+  lapply(sheets, function(s) {
+    read_excel('../../../data/field/TilhillOlivia2025.xlsx', sheet = s)
+  })
+)
+names(all_sheets) <- sheets
+
+# remove meta sheets
+all_sheets <- all_sheets[-c(1,2)]
+
+#fix the colnames issue
+all_sheets <- map(
+  all_sheets,
+  ~ .x %>%
+    rename_with(~ str_replace(.x, "Height\\s+_cm_", "Height_cm_"))
+)
+
+#add the delta_h in now
+all_sheets <- map(all_sheets, ~ .x %>%
+                    mutate(
+                      delta_h   = Height_cm_1 - Height_cm_0,
+                      delta_rcd = Rcd_mm_1 - Rcd_mm_0
+                    ))
+                   
+
+selected_cols <- all_sheets_long <- map(all_sheets, ~ .x %>%
+                         dplyr::select(Tree_Species, Comment_1, Treatment, Health_1, delta_h, delta_rcd)) 
+
+
+#make long df
+df_long <- bind_rows(
+  selected_cols,
+  .id = "Plot"
+)
+r
+#change teatment names
+df_long <- df_long %>%
+  mutate(
+    Treatment = case_when(
+      Treatment == "Fungi_Control" ~ "Control",
+      Treatment == "Treatment"     ~ "Pellet",
+      TRUE                         ~ Treatment  # keep all other values
+    )
+  )
+
+df_long_noDt <- df_long %>%
+  filter(
+    is.na(Comment_1) |
+    !str_detect(
+      Comment_1,
+      regex("\\bDt\\b|\\bdead\\s+top\\b|\\bDying\\b", ignore_case = TRUE)
+    )
+  )
+
+```
+
+INTERNAL DOCUMENT ONLY
+
+SUMMARY
+
+INTRODUCTION
+
+This Tillhill site is MBR planting where mix of trees spp spread over multiple plots. Not a balanced design for analysis, but we will be able to pull out enough from some plots to use plot as a random effect. Might have fewer random than ideal - i.e. < 5. 
+
+TREATEMENTS
+Control/Treatment across 9 plots - paired with MBR in each
+Lac am. 
+
+METHODS
+Block 11. Larger -ves are health 0. ~ 6 trees -5 < delta_h < 0. Prob omit these and leave the 0
+Block 12 - many larger -ve change in ht due to Dt - remove all rows with Comment_1 contains dead top or Dt, many of these are health_0 anyway, a few are not, changed one pine with health 2 and height_1 = 0
+Block 13. Some large -ves with health 2, some comment as dead top - remove rows with dead top or Dt
+
+Some -ves are because if ht is entered as 0 or NA , when 0, delta h is calculated, if NA, then its not
+
+ANALYSIS
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#explore data - what do -ve heights look like etc and how many trees per plot etc.
+
+p1 = ggplot(df_long, aes(x = factor(Health_1), y = delta_h)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # color & fill
+   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # horizontal line at 0
+  labs(
+    x = "Health class",
+    y = "Change in height (cm)",
+   ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12)
+  )
+
+#this is after the Dt and dead top have been removed
+p2 = ggplot(df_long_noDt, aes(x = factor(Health_1), y = delta_h)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # color & fill
+   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # horizontal line at 0
+  labs(
+    x = "Health class",
+    y = "Change in height (cm)",
+   ) +
+  theme_bw() +
+  theme(
+    text = element_text(size = 12)
+  )
+
+ 
+p1 / p2
+```
+
+Most negative change in height in health_0, as expected - three were large positive delta h in health 0 - these must have been errors, and health changed to 2. There was also 1 pine with health NA, but heights recorded, this must be error and changed to health_2. The remaining Health NA are lost trees. For remaining trees some are dead top, all these need to be removed as the change in height cannot be assessed. 
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#explore negative some more
+#leave out the health 0 as we know they are all -ve
+df_neg <- df_long_noDt %>%
+  filter( Health_1 >0,
+         delta_h <= 0)
+
+# Quick histogram of negative delta_h values
+p1 = ggplot(df_neg, aes(x = delta_h)) +
+  geom_histogram(binwidth = 1, fill = "firebrick", color = "black") +
+  scale_x_continuous(breaks = seq(floor(min(df_neg$delta_h)),
+                                  ceiling(max(df_neg$delta_h)), by = 1)) +
+  labs(title = "Distribution of negative delta_h values for all tree spp",
+       subtitle = "Health_1 =1 or 2",
+       x = "delta_h (cm) (negative values only)",
+       y = "Count") +
+  theme_minimal()
+#overlapping bars for control and treatment
+ggplot(df_neg, aes(x = delta_h, fill = Treatment)) +
+  geom_histogram(binwidth = 1, color = "black",
+                 position = position_dodge(width = 1), alpha = 0.8) +
+  scale_x_continuous(breaks = seq(floor(min(df_neg$delta_h)),
+                                  ceiling(max(df_neg$delta_h)), by = 1)) +
+  scale_fill_manual(values = c("Control" = "orange", "Pellet" = "forestgreen")) +
+  labs(title = "Distribution of negative delta height values for all tree spp",
+       subtitle = "Health_1 = 1 or 2",
+       x = "change in height (cm) (negative values only)",
+       y = "Count",
+       fill = "Treatment") +
+  theme_minimal()
+
+#cumulative totals
+
+# Define bins in the order you want
+bins <- 0:-5  # 0, -1, -2, ..., -5
+
+# Compute counts and cumulative counts per Treatment
+df_cum <- df_neg %>%
+  group_by(Treatment) %>%
+  summarise(count = table(factor(delta_h, levels = bins))) %>%
+  tidyr::unnest(cols = c(count)) %>%
+  group_by(Treatment) %>%
+  mutate(
+    bin = bins,
+    cum_count = cumsum(count)
+  ) %>%
+  ungroup()
+
+p2 = ggplot(df_cum, aes(x = bin, y = cum_count, color = Treatment)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = bins) +
+  scale_color_manual(values = c("Control" = "orange", "Pellet" = "forestgreen")) +
+  labs(
+    title = "Cumulative frequency of negative delta h for all tree spp",
+    subtitle = "Health_1 = 1 or 2",
+    x = "change in height (cm) threshold",
+    y = "Cumulative count",
+    color = "Treatment"
+  ) +
+  theme_minimal()
+
+
+
+p1 /p2
+
+```
+
+Frequencies of counts of negative delta_h
+The large negative values will be removed anyway - but looking at the smaller ones, -1 and 0, where we know our measurement error lies. If we leave out anything 0 and below, we lose 7 treatment and 4 control trees. If we include -1, we lose 10 treatment and 5 control trees. SInce there arent many trees at this site in each block - look at block summaries if we keep 0s, -1s, etc.
+
+The tables show the number of control and treatment trees in each block if we retain i) delta h >= 0, or secondly - delta_h > -1. Increasing the range of delta h to -1 adds 5 trees, spread across the different plots. By increasing the range it doesnt mean we then have a tree sp or block which can incorporate into the analysis which wasnt there if delta_h >= 0. 
+
+Therefore we will carry on with data filtered s.t health_1 >=1 and delta_h >= 0 
+
+```{r, echo=FALSE, warning=FALSE, fig.height=9, fig.width=7, fig.pos='H'}
+# Summarize number of trees per Tree_species × Plot
+
+#this for delta h includes zeros
+tree_counts0 <- df_long_noDt %>%
+  filter(Health_1 > 0, delta_h >= 0) %>%
+  group_by(Tree_Species, Plot, Treatment) %>%
+  summarise(n_trees = n(), .groups = "drop") %>%
+  arrange(Tree_Species, Plot)
+
+# Pivot to wide format: plots as columns
+tree_counts_wide0 <- tree_counts0 %>%
+  pivot_wider(names_from = Plot, values_from = n_trees, values_fill = 0)
+
+
+tree_counts_wide0
+ #this for delta h strictly > 0
+tree_counts1 <- df_long_noDt %>%
+  filter(Health_1 >0, delta_h >=-1) %>%
+  group_by(Tree_Species, Plot, Treatment) %>%
+  summarise(n_trees = n(), .groups = "drop") %>%
+  arrange(Tree_Species, Plot)
+
+# Pivot to wide format: plots as columns
+tree_counts_wide1 <- tree_counts1 %>%
+  pivot_wider(names_from = Plot, values_from = n_trees, values_fill = 0)
+
+
+tree_counts_wide1
+```
+
+If we filter health >=1 and delta h >= 0 this leaves multiple plots per tree species, but not 3.
+
+Alnus : 2 plots \newline
+Betula: 3 plots \newline
+Corylus: 2 plots \newline
+Pinus: 2 plots \newline
+Quercus 4 plots \newline
+
+Therefore we will first change in heights for alnus and corylus. If the data looks interesting, maybe test, even though set up not ideal. \newline
+For Betula and oak we model with plot as random \newline
+
+Start with a model for Betula.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+
+#box plots and bar plots of change in height - includes the zeros
+
+#get the birch data
+#filter for health > 0 and delta_h >=0
+BirchPlots = c('Block 11', 'Block 12', 'Block 14')
+birch <- df_long_noDt %>%
+  filter(
+    Tree_Species == "Betula_pubescens",
+    Health_1 > 0,
+    delta_h >= 0,
+    Plot %in% BirchPlots
+  )
+
+
+
+p1 = ggplot(birch, aes(x = Treatment, y = delta_h, fill = Treatment)) +
+  geom_boxplot(width = 0.7, outlier.shape = 21, color = "black") +
+  facet_wrap(~ Plot, scales = "free_y") +  # one facet per species
+  scale_fill_manual(values = c(Control = "orange", Pellet = "forestgreen" )) +
+  labs(
+    title = "Distribution of delta_h by Treatment and Plot, Betula",
+    x = "Treatment",
+    y = "Change in Height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+
+# summary data for the positive only
+
+df_summary_delta_h <- birch %>%
+  group_by(Plot, Treatment) %>%
+  summarise(
+    mean_delta_h = mean(delta_h, na.rm = TRUE),
+    se_delta_h   = sd(delta_h, na.rm = TRUE) / sqrt(n()),
+    n            = n(),
+    .groups = "drop"
+  )
+
+p2 = ggplot(df_summary_delta_h, aes(x = Treatment, y = mean_delta_h, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  geom_errorbar(aes(ymin = mean_delta_h - se_delta_h, ymax = mean_delta_h + se_delta_h),
+                width = 0.3, color = "black") +
+  facet_wrap(~ Plot, scales = "free_y") +
+  scale_fill_manual(values = c(
+    Control = "orange",
+    Pellet  = "forestgreen"
+  )) +
+  labs(
+    title = "Mean delta_h  SE by Treatment and Plot, Betula",
+    x = "Treatment",
+    y = "Mean Change in Height (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p1/p2
+```
+
+```{r, echo=FALSE, warning=FALSE,message = FALSE, results = 'hide',fig.height=4, fig.width=7, fig.pos='H'}
+#Bayesian model
+
+
+BirchPlots = c('Block 11', 'Block 12', 'Block 14')
+birch <- df_long_noDt %>%
+  filter(
+    Tree_Species == "Betula_pubescens",
+    Health_1 > 0,
+    delta_h >= 0,
+    Plot %in% BirchPlots
+  )
+df_model =  birch %>% mutate(delta_h_pos = delta_h + 0.1)
+
+#+0.1 to get rid of zeros for lognormal
+
+
+suppressMessages({
+  library(brms)
+  library(tibble)
+})
+
+
+
+#posterior means and credibilty intervals
+m_gauss <- brm(
+  delta_h ~ Treatment + (1 | Plot),  # random intercept for Plot
+  data = birch,
+  family = gaussian(),
+  chains = 4, cores = 4
+)
+
+#this extracts the effect size for the pellet (i.e, intercept+pellet effect)
+#since this is lognormal, actual effect size is exp(intercept+pellet)
+summary = posterior_summary(m_gauss, probs = c(0.025, 0.975))
+
+#need to back transform because used a log-normal
+#b_intercept is the basline or control, b_Treatment is difference in log(delta_h) due to pellet
+
+
+
+#  Extract posterior samples- this gives a df of effect sizes based on the distribution
+#for the effect sizes from the model
+post <- posterior_samples(m_gauss)
+n <- nrow(post)
+
+#get the control (intercept) effect, and transform back from lognormal
+control_vals <- exp(post$b_Intercept) 
+median_control <- median(control_vals)
+ci_control <- quantile(control_vals, probs = c(0.025, 0.975))
+
+pellet_vals <- exp(post$b_Intercept + post$b_TreatmentPellet)
+median_pellet <- median(pellet_vals)
+ci_pellet <- quantile(pellet_vals, probs = c(0.025, 0.975))
+
+pct_change <- (pellet_vals / control_vals - 1) * 100
+median_pct <- median(pct_change)
+ci_pct <- quantile(pct_change, c(0.025, 0.975))
+
+
+
+summary_table <- tibble(
+  Parameter = c("Control (Intercept)", "Pellet", "Pellet % change"),
+  Median = c(median_control, median_pellet, median_pct),
+  CI_lower = c(ci_control[1], ci_pellet[1], ci_pct[1]),
+  CI_upper = c(ci_control[2], ci_pellet[2], ci_pct[2])
+)
+
+print(summary_table)
+
+#lets get a probability of positive change
+#this gives the number of TRUE for mean of treatment effect is > 0
+prob_positive = mean(post$b_TreatmentPellet >0)
+
+###############################################################################
+#MODEL VALIDATION - JUST LOOKING AT RESIDUALS VERUS ACTUAL AND PLOT OF ACTUAL MEAN VERSUS
+#THE MODELLED MEANS
+
+#this looks at fitting method - need rhat = 1
+#print(m)
+
+
+#rediduals versus fitted
+# Posterior predicted values (median for each observation)
+y_pred <- apply(posterior_predict(m_gauss), 2, median)
+
+# Observed values
+y_obs <- df_model$delta_h_pos
+
+# Residuals
+resid <- y_obs - y_pred
+
+# Basic residuals vs predicted plot
+plot(y_pred, resid,
+     xlab = "Predicted change in height (median posterior)",
+     ylab = "Residuals",
+     main = "Residuals vs Predicted for Quercus Model",
+     pch = 16, col = "steelblue")
+abline(h = 0, col = "red", lty = 2)
+
+#look at model predictions for mean of control and mean of treatment
+# Simulate posterior predictions, from each start vlaue of delta he, predict
+#on the model geneates a set of new delta ha's
+y_rep <- posterior_predict(m_gauss)  # matrix: draws x observations
+
+# Indices for each treatment
+ctrl_idx <- which(df_model$Treatment == "Control")
+pellet_idx <- which(df_model$Treatment == "Pellet")
+
+# Compute mean per draw for each group of simulations
+mean_ctrl <- apply(y_rep[, ctrl_idx], 1, mean)
+mean_pellet <- apply(y_rep[, pellet_idx], 1, mean)
+
+# Observed means
+obs_mean_ctrl <- mean(df_model$delta_h_pos[ctrl_idx])
+obs_mean_pellet <- mean(df_model$delta_h_pos[pellet_idx])
+
+# Plot
+hist(mean_ctrl, breaks = 30, col = rgb(0,0,1,0.3), main="Posterior predictive means", xlab=" change in height")
+abline(v = obs_mean_ctrl, col = "blue", lwd = 2)
+hist(mean_pellet, breaks = 30, col = rgb(1,0,0,0.3), add = TRUE)
+abline(v = obs_mean_pellet, col = "red", lwd = 2)
+legend("topright", legend=c("Control","Pellet"), col=c("blue","red"), lwd=2)
+
+```

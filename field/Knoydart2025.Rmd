@@ -1,0 +1,410 @@
+---
+title: "Knoydart Monitoring Survey 2025"
+author: "Petra Guy"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(readxl)
+  library(dplyr)
+  library(tidyr)
+  library(ggpubr)
+  library(ggplot2)
+ library(nlme)
+  library(kableExtra)
+  library(stringr)
+  library(ggpattern) 
+  library(patchwork)
+  library(lme4)
+  library(lmerTest)
+library(broom.mixed)
+  library(emmeans)
+
+  
+  knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+})
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+#read raw data
+data = read_excel('../../../data/field/Knoydart2025.xlsx')
+
+
+
+sheets <- excel_sheets('../../../data/field/Knoydart2025.xlsx')  # get sheet names
+
+# read all sheets into a named list, suppressing the New names messages
+all_sheets <- suppressMessages(
+  lapply(sheets, function(s) {
+    read_excel('../../../data/field/Knoydart2025.xlsx', sheet = s)
+  })
+)
+
+names(all_sheets) <- sheets
+
+# remove meta
+all_sheets <- all_sheets[-c(1,8)]
+
+
+#make long df
+df_long <- bind_rows(
+  all_sheets,
+  .id = "Plot"
+)
+
+#tidy - remove comments column and health
+
+df_long = df_long[-c(6,7)]
+
+
+#simplify a bit by make rcd different to height - could pivot longer by both, but
+
+df_long_height = df_long[-c(5,7)]
+df_long_rcd = df_long[-c(4,6)]
+
+#now want to make long by time point - all Height_0 need a t0 column and Height_1 need a t1 column - then pivot longer
+
+df_longer_height <- df_long_height %>%
+  pivot_longer(
+    cols = c(Height_cm_0, Height_cm_1),   # columns to pivot
+    names_to = "Time",                     # new column that will hold t0/t1
+    values_to = "Height"                   # new column with height values
+  ) %>%
+  mutate(
+    Time = case_when(
+      Time == "Height_cm_0" ~ "t0",
+      Time == "Height_cm_1" ~ "t1"
+    )
+  )
+ 
+#add site and treatment columns
+
+df_longer_height <- df_longer_height %>%
+  separate(
+    col = Plot,
+    into = c("Site", "Treatment"),
+    sep = "_",
+    remove = FALSE
+  )
+
+#replace _ for printing otherwise freaks out
+df_longer_height <- df_longer_height %>%
+   mutate(
+    Tree_Species = gsub("_", " ", Tree_Species)
+  )
+
+df_longer_rcd <- df_long_rcd %>%
+  pivot_longer(
+    cols = c(Rcd_mm_0, Rcd_mm_1),   # columns to pivot
+    names_to = "Time",                     # new column that will hold t0/t1
+    values_to = "Rcd"                   # new column with height values
+  ) %>%
+  mutate(
+    Time = case_when(
+      Time == "Rcd_mm_0" ~ "t0",
+      Time == "Rcd_mm_1" ~ "t1"
+    )
+  ) 
+
+df_longer_rcd <- df_longer_rcd %>%
+  separate(
+    col = Plot,
+    into = c("Site", "Treatment"),
+    sep = "_",
+    remove = FALSE
+  )
+
+```
+
+INTERNAL DOCUMENT ONLY\newline
+
+SUMMARY\newline
+Oaks showed a 75 percnt greater average plot change in height compared to controls, and trees treated with fertilizer as well as pellet showed 54 percnt plot average height change.
+These results should be treated with caution due to small numbers of trees, lack of repeats, within site variations, and lack of consistent pattern seen with other tree species and treatments.
+\newline
+
+INTRODUCTION\newline
+Knoydart was small afforestation scheme of planting of oak, birch and pine in two different areas. One area was pine with some birch, the other was oak with some birch. Only a small number of trees were treated. The customer decided on treatments and planting areas. Because of the naturalistic planting style - i.e. not rows, and the heavy undergrowth, find trees at the second time point was difficult. Some tags were missing and some tags were found in year 1 that were not recorded in year 0. Possible incorrect data entry. Many trees overgrown with moor grass and could not be found, whilst birch had lost all leaves at second measuring point and therefore v difficult to locate small orange stem amongst orange stemmed moor grass.
+\newline
+
+TREATMENTS\newline
+Oak/Birch/Pine with fertilizer+Pellet, Pellet, Nothing.
+oak and Birch in one area and pine and birch in another.
+\newline
+
+
+METHODS\newline
+Height and rcd collected at 2 time points, nov 2024 and nov 2025.
+\newline
+
+ANALYSIS\newline
+Because we do not have separate plots, all oak/pine in one  place - potentially could consider that we have 2 birch plots.Also since there are only a small number of trees and some issues with missing data - this will be simple plot average exploration. Plot averages at initial and final time points will be compared. Because of missing trees the final time point is a smaller subset of the start.
+\newpage
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#summary table for number of trees
+summary_table_wide <- df_longer_height %>%
+  filter(!is.na(Height)) %>%       # only count actual measurements
+  group_by(Plot, Tree_Species, Time) %>%
+  summarise(n_trees = n(), .groups = "drop") %>%
+  pivot_wider(
+    names_from = Time,
+    values_from = n_trees,
+    values_fill = 0                # if no trees, fill with 0
+  )
+
+# Display nicely
+summary_table_wide %>%
+  kable(
+    caption = "Number of trees with measured Height by Plot, Tree Species, and Time",
+    col.names = c("Plot", "Tree Species", "t0", "t1"),
+    align = c("c", "c", "c", "c")
+  ) %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+
+```
+
+The table shows that many trees could not be located at the second time point. Some of these will be dead, but some were just difficult to locate, hence mortality cannot be estimated. In the Quercus area only 1 birch was found in the control plot, hence we cannot compare chnage in height for birch in this location.
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#mean plot change in height.
+
+# Compute mean heights per Plot and Tree Species
+
+#but remove the single birch from Quercus Control plot
+mean_heights_species_change_filtered <- df_longer_height %>%
+  filter(!is.na(Height)) %>%
+  filter(!(Plot == "Quercus_Control" & Tree_Species == "Betula pubescens")) %>%
+  # keep Site and Treatment
+  group_by(Plot, Tree_Species, Site, Treatment, Time) %>%
+  summarise(mean_height = mean(Height), .groups = "drop") %>%
+  pivot_wider(
+    names_from = Time,
+    values_from = mean_height,
+    names_prefix = "Height_"
+  ) %>%
+  mutate(
+    Height_change = Height_t1 - Height_t0
+  )
+
+df_summary <- mean_heights_species_change_filtered %>%
+  select(Site, Treatment, Tree_Species, Height_change)
+
+# Display nicely
+df_summary %>%
+  kable(
+    caption = "Mean plot change in height",
+    col.names = c("Site", "Treatment", "Tree species", "Height Change"),
+    digits = 2,
+    align = c("c", "c", "c", "c", "c")
+  ) %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+Table show plot averages and change in height is plot change. The birch has been removed from Quercus control  area as it was only 1 tree.
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+#plot heights 
+#but remove the single birch from Quercus Control plot
+mean_heights_species_change_filtered <- df_longer_height %>%
+  filter(!is.na(Height)) %>%
+  filter(!(Plot == "Quercus_Control" & Tree_Species == "Betula pubescens")) %>%
+  # keep Site and Treatment
+  group_by(Plot, Tree_Species, Site, Treatment, Time) %>%
+  summarise(mean_height = mean(Height), .groups = "drop") %>%
+  pivot_wider(
+    names_from = Time,
+    values_from = mean_height,
+    names_prefix = "Height_"
+  ) %>%
+  mutate(
+    Height_change = Height_t1 - Height_t0
+  )
+ 
+df_quercus <- df_summary %>% filter(Site == "Quercus")
+df_quercus <- df_quercus %>%
+  mutate(
+    Treatment = factor(Treatment, levels = c("Control", "MO", "MF"))
+  )
+
+p1 = ggplot(df_quercus, aes(x = Treatment, y = Height_change, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Tree_Species, drop = TRUE) +
+  scale_fill_manual(
+    values = c(
+      Control = "orange",
+      MO      = "forestgreen",
+      MF      = "blue"
+    )
+  ) +
+  labs(
+    title = "Average plot height change at Quercus site",
+    x = "Treatment",
+    y = "Height Change (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"   # optional, since x already shows Treatment
+  )
+
+df_pine <- df_summary %>% filter(Site == "Pinus")
+df_pine <- df_pine %>%
+  mutate(
+    Treatment = factor(Treatment, levels = c("Control", "MO", "MF"))
+  )
+
+p2 = ggplot(df_pine, aes(x = Treatment, y = Height_change, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Tree_Species, drop = TRUE) +
+  scale_fill_manual(
+    values = c(
+      Control = "orange",
+      MO      = "forestgreen",
+      MF      = "blue"
+    )
+  ) +
+  labs(
+    title = "Average plot height change at Pine site",
+    x = "Treatment",
+    y = "Height Change (cm)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"   # optional, since x already shows Treatment
+  )
+
+p1 / p2
+```
+
+Average plot change in height. For oak, the pellet trees and a greater change in height than the control or fertilized trees - a 75 percnt change compared to control, whereas the fertilized trees show a 54 percnt plot average height change. There is no control comparison for for birch in the Quercus area, but fertilized birch showed greater height change than trees with pellets alone. At the pine site, pelleted trees showed less change in height than fertilized or control. 
+\newpage
+
+CHANGE IN RCD
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=4, fig.width=7, fig.pos='H'}
+#mean plot change in rcd
+
+# Compute mean rcd per Plot and Tree Species
+
+#but remove the single birch from Quercus Control plot
+df_summary_rcd <- df_longer_rcd %>%
+  filter(!is.na(Rcd)) %>%  # keep only measured values
+  group_by(Site, Treatment, Tree_Species, Time) %>%
+  summarise(mean_Rcd = mean(Rcd), .groups = "drop") %>%  # mean per group × time
+  pivot_wider(
+    names_from = Time,
+    values_from = mean_Rcd,
+    names_prefix = "Rcd_"
+  ) %>%
+  mutate(
+    Rcd_change = Rcd_t1 - Rcd_t0  # mean change per group
+  )
+
+
+# Display nicely
+df_summary_rcd %>% select (Site, Treatment, Tree_Species, Rcd_change) %>%
+  kable(
+    caption = "Mean plot change in rcd",
+    col.names = c("Site", "Treatment", "Tree species", "Rcd Change"),
+    digits = 2,
+    align = c("c", "c", "c", "c", "c")
+  ) %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+
+```{r, echo=FALSE, warning=FALSE, fig.height=7, fig.width=7, fig.pos='H'}
+
+#plot the rcds
+
+#but remove the single birch from Quercus Control plot
+df_summary_rcd <- df_longer_rcd %>%
+  filter(!is.na(Rcd)) %>%  # keep only measured values
+  group_by(Site, Treatment, Tree_Species, Time) %>%
+  summarise(mean_Rcd = mean(Rcd), .groups = "drop") %>%  # mean per group × time
+  pivot_wider(
+    names_from = Time,
+    values_from = mean_Rcd,
+    names_prefix = "Rcd_"
+  ) %>%
+  mutate(
+    Rcd_change = Rcd_t1 - Rcd_t0  # mean change per group
+  )
+
+df_quercus <- df_summary_rcd %>% filter(Site == "Quercus")
+df_quercus <- df_quercus %>%
+  mutate(
+    Treatment = factor(Treatment, levels = c("Control", "MO", "MF"))
+  )
+
+p1 = ggplot(df_quercus, aes(x = Treatment, y = Rcd_change, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Tree_Species, drop = TRUE) +
+  scale_fill_manual(
+    values = c(
+      Control = "orange",
+      MO      = "forestgreen",
+      MF      = "blue"
+    )
+  ) +
+  labs(
+    title = "Average plot rcd change at Quercus site",
+    x = "Treatment",
+    y = "Rcd Change (mm)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"   # optional, since x already shows Treatment
+  )
+
+df_pine <- df_summary_rcd %>% filter(Site == "Pinus")
+df_pine <- df_pine %>%
+  mutate(
+    Treatment = factor(Treatment, levels = c("Control", "MO", "MF"))
+  )
+
+p2 = ggplot(df_pine, aes(x = Treatment, y = Rcd_change, fill = Treatment)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ Tree_Species, drop = TRUE) +
+  scale_fill_manual(
+    values = c(
+      Control = "orange",
+      MO      = "forestgreen",
+      MF      = "blue"
+    )
+  ) +
+  labs(
+    title = "Average plot height rcd at Pine site",
+    x = "Treatment",
+    y = "Rcd Change (mm)"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"   # optional, since x already shows Treatment
+  )
+
+p1 / p2
+```
+Ignoring the betula control at the oak site - this is just one tree, forgot to remove the row. As with heights, there is greatest change in rcd for oak with pellet compared to oak with fert and control oak at the oak site 5 percnt increase compared to control plots  whereas fertilized show 37 percnt less change in height than control.
+
+DISCUSSION
+Data from this site may need to be taken cautiously since we had very few trees and no blocking or randomization. Only plot averages were calculated, on a small number of tees, which was different at the two time points. There was also within area differences between control and treatment areas which may have had a greater influence on change in height, and referring to maps, you can see that each treatment was in a different location. Control trees and the pine area, for instance, were all at a lower altitude. 
+\newline
+GOING FORWARD\newline
+We will not continue with this site due to the small numbers of trees, potential for high within site differences and lack of repeats.
+
+

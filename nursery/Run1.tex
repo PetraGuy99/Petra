@@ -1,0 +1,223 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Elsoms Run 1},
+  pdfauthor={Petra Guy},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Elsoms Run 1}
+\author{Petra Guy}
+\date{2025-11-17}
+
+\begin{document}
+\maketitle
+
+This is data analysis notes - more details also see Nursery
+Trials/Experiments/Run 1/Elsoms Run 1 Results
+
+We grew sitka, birch and pine with different emf at different fertilizer
+levels to see whether higher fertilizer would influence emf colorization
+of roots. We obtained media without added fertilizer, asked the supplier
+the quantities of added fertilizer per litre and then added this back in
+at 25, 50, 75 and 100\% of their usual amounts.
+
+We had a limited selection of emf at the time (due to other commitments
+in production) and therefore only used heb and pax with birch, sui with
+pine and sui heb and pax with sitka. Note that there was some query with
+the heb sequence and on reBLAST it came back as pax - so this experiment
+may be limited sitka/pax, sitka/sui, birch/pax, pine/sui. Further - note
+that this is not a trial of responses due to different strains in the
+library as we would need to trial all strains of interest at the same
+time.
+
+We also wanted to look at any pellet effect and therefore included the
+use of an uninoculated blank pellet as well as a no pellet control.
+
+There were 40 trees in each treatment.
+
+Trees were miniplugs planted in early January.
+
+This trial looked at:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\item
+  Whether higher fertilizer levels would affect emf colonization rates
+  on the roots (as quantified by change in height)
+\item
+  Any effect of pellet as a fertilizer
+\item
+  Any difference in growth of birch/pine/sitka with emf compared to
+  control
+\item
+  Any difference in growth for birch and sitka between emf (no rigorous)
+\end{enumerate}
+
+Data collected in this run - initial height, final height, mortality
+
+Treatments: Control - no pellet (co), Control with blank pellet (co),
+heb, pax, sui
+
+Trees, \emph{Betula pendula} (BP), \emph{Pinus sylvestris} (PS),
+\emph{Picea sitchensis} (SITKA)
+
+Data munging:
+
+Initial height data was collected as frequencies, e.g.~number of sitka
+of 2-3cm, number of 3-4cm, partly due to time constraints measuring
+individual trees (PG set up this run alone) but in retrospect, since
+they are so small, this might not be a bad way of recording them. This
+initial data must first be reshaped into columns of heights.
+
+initial := long\_df\_i
+
+Final heights also need some re-shaping to a long df, but data was
+recorded as height per tree
+
+final := long\_df\_f
+
+Final part of reshaping combines initial and final data, adds the time
+point
+
+long\_df\_i \& long\_df\_f:= combined\_df
+
+Finally, change in height is calculated as the average of each treatment
+at each fert level
+
+merged\_df = average change in heights grouped by tree/emf/fert
+
+Inital exploration - box plots of change in heights
+
+\includegraphics{Run1_files/figure-latex/unnamed-chunk-2-1.pdf}
+\includegraphics{Run1_files/figure-latex/unnamed-chunk-2-2.pdf}
+\includegraphics{Run1_files/figure-latex/unnamed-chunk-2-3.pdf} Initial
+exploration suggests birch and sitka had greater change in height than
+controls, but this is less clear for pine. The blank pellet does not
+appear to have had any affect.
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  Does fertilizer affect growth?
+\end{enumerate}
+
+To see whether there is a relationship between change in height and
+fertilizer levels, use linear model
+
+\includegraphics{Run1_files/figure-latex/unnamed-chunk-3-1.pdf} The
+linear model suggests no correlation between fertilizer and change in
+height. Although for cb/BP treatment the slope and R\textsuperscript{2}
+= 0.59 looks like a correlation, p = 0.128 suggest it is weak. Similarly
+for pax/BP there is a weak correlation (p = 0.08). Any correlation is
+not consistent between treatments.
+
+The lack of correlation may be due to improper mixing of fertilizer back
+in to the media. The added chemicals were granular and hence it was
+impossible to ensure full homogenization. Therefore, this data may be
+inconclusive.
+
+The final part of this analysis would be to observe roots, but so far we
+have not had time/people to do that. Therefore it could be that case
+that physical colonization is different, but it has not translated in a
+change in height.
+
+Since the impact of fertilizer on growth appears non-significant - all
+the data will be combined to create a larger data set such that each
+treatment had 5 repeats.
+
+\includegraphics{Run1_files/figure-latex/unnamed-chunk-4-1.pdf}
+\includegraphics{Run1_files/figure-latex/unnamed-chunk-4-2.pdf}
+\includegraphics{Run1_files/figure-latex/unnamed-chunk-4-3.pdf}
+
+The plots combine the fertilizer treatments into a repeat, so that there
+are 5 reps of each emf/tree treatment. The coloured points on the charts
+show the average change in height for that fertilizer level. That is,
+the average of 40 trees per fertilizer level, The box plots visualize
+all data for each treatment combined, that is 200 trees in total per
+combined treatment. The p values are t test compare to co
+
+Birch shows change in height for pellet compared to controls. There is a
+significant change in height of \textasciitilde3.75cm over the growing
+period
+
+Pine shows no significant difference in change in height. This could be
+for several reasons. i) The pine at Elsoms is already colonized by
+something, we need to examine the roots to see what it is - might be
+highly colonized by a sui to start with. ii) With the trays on the
+matting, roots had grown out of the trays and into the mats and were
+highly intermixed. Difficult to say that these were separate treatments
+
+Sitka shows significant (p = 0.0498 compared to co) but very small
+change in height of around 1.5cm for sui, but not for pax or heb. This
+may be because sui is better at promoting growth in these conditions.
+Height change may be small because plants were harvested before the
+typical late season flush Blank pellet had no affect in any treatment
+
+Note that for all birch and sitka, the heb/pax response was the same,
+further indicating that this heb could be a pax.
+
+Also note - no difference between co and cb.
+
+\end{document}
